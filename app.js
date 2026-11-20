@@ -27,6 +27,12 @@
   }
 
   // ── STATE ───────────────────────────────────────────
+  // Firebase sync vars — declared here so saveState can reference them
+  let _fbApp            = null;
+  let _fbDb             = null;
+  let _fbRef            = null;
+  let _pauseRemoteWrite = false;
+
   let state = loadState();
 
   function defaultState() {
@@ -62,6 +68,10 @@
   function saveState() {
     try { localStorage.setItem('ptmakmur_v2', JSON.stringify(state)); }
     catch(e) {}
+    // Push to Firebase if connected (defined later in initCloudSync)
+    if (typeof _fbRef !== 'undefined' && _fbRef && typeof _pauseRemoteWrite !== 'undefined' && !_pauseRemoteWrite) {
+      try { _fbRef.set(JSON.parse(JSON.stringify(state))).catch(() => {}); } catch(e2) {}
+    }
   }
 
   function todayStr() {
@@ -648,6 +658,12 @@
     navigateTo(pageId);
   }
 
+  // Render all pages (called after cloud sync state merge)
+  function renderAll() {
+    renderDashboard();
+    refreshCurrentPage();
+  }
+
   // ── UNIQUE ID ───────────────────────────────────────
   function uid() {
     return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -978,7 +994,7 @@
       const sidebar = document.getElementById('sidebar');
       const btn = document.getElementById('mobileMenuBtn');
       if (sidebar?.classList.contains('mobile-open') &&
-          !sidebar.contains(e.target) && e.target !== btn) {
+          !sidebar.contains(e.target) && !btn?.contains(e.target)) {
         sidebar.classList.remove('mobile-open');
       }
     });
@@ -1127,12 +1143,299 @@
     });
   }
 
+  // ── CLOUD SYNC ──
+  const FIREBASE_CFG_KEY  = 'ptmakmur_firebase_url';
+  // (_fbApp, _fbDb, _fbRef, _pauseRemoteWrite declared at top of module)
+
+  function getSyncDot()   { return document.getElementById('topbarSyncDot'); }
+  function getSyncLabel() { return document.getElementById('topbarSyncLabel'); }
+  function getSyncPill()  { return document.getElementById('sidebarSyncPill'); }
+
+  function setSyncOnline(on) {
+    const dot  = getSyncDot();
+    const lbl  = getSyncLabel();
+    const pill = getSyncPill();
+    if (dot)  { on ? dot.classList.add('online')  : dot.classList.remove('online'); }
+    if (lbl)  { lbl.textContent = on ? '🟢 Tersinkron' : 'Cloud Sync'; }
+    if (pill) {
+      pill.textContent = on ? 'Online' : 'Offline';
+      on ? pill.classList.add('online') : pill.classList.remove('online');
+    }
+    // Update modal status
+    const dot2 = document.getElementById('syncStatusDot');
+    const txt  = document.getElementById('syncStatusText');
+    const sub  = document.getElementById('syncStatusSub');
+    if (dot2) dot2.style.cssText = on
+      ? 'width:10px;height:10px;border-radius:50%;background:#22c55e;box-shadow:0 0 10px #22c55e;display:inline-block;'
+      : 'width:10px;height:10px;border-radius:50%;background:#ef4444;box-shadow:0 0 10px #ef4444;display:inline-block;';
+    if (txt) txt.textContent = on ? '✅ Terhubung ke Firebase Cloud' : 'Belum Terhubung ke Cloud';
+    if (sub) sub.textContent = on
+      ? 'Data sinkron otomatis antar HP, Laptop, dan semua pendiri. ☁️'
+      : 'Data saat ini tersimpan di memori lokal HP/Laptop ini saja.';
+  }
+
+  function connectFirebase(url) {
+    if (!url || !url.startsWith('https://')) {
+      showToast('URL Firebase tidak valid! Harus diawali https://', 'error');
+      return;
+    }
+    try {
+      // Destroy previous instance
+      if (_fbApp) {
+        try { _fbApp.delete(); } catch(e) {}
+        _fbApp = null; _fbDb = null; _fbRef = null;
+      }
+
+      const cfg = { databaseURL: url.replace(/\/$/, '') };
+      _fbApp = firebase.initializeApp(cfg, 'ptmakmur_' + Date.now());
+      _fbDb  = firebase.database(_fbApp);
+      _fbRef = _fbDb.ref('ptmakmur/state');
+
+      // On connect, push current local state first, then listen
+      _fbRef.once('value').then(snap => {
+        const remote = snap.val();
+        if (remote) {
+          // Merge: remote wins for history, local wins for today session
+          const merged = mergeStates(state, remote);
+          _pauseRemoteWrite = true;
+          state = merged;
+          saveState();
+          renderAll();
+          _pauseRemoteWrite = false;
+        }
+        // Write local state to cloud
+        _fbRef.set(JSON.parse(JSON.stringify(state)));
+
+        // Listen for changes from other devices
+        _fbRef.on('value', snap => {
+          if (_pauseRemoteWrite) return;
+          const remote = snap.val();
+          if (!remote) return;
+          const merged = mergeStates(state, remote);
+          _pauseRemoteWrite = true;
+          state = merged;
+          saveState();
+          renderAll();
+          _pauseRemoteWrite = false;
+        });
+
+        setSyncOnline(true);
+        localStorage.setItem(FIREBASE_CFG_KEY, url);
+        showToast('☁️ Cloud Sync aktif! Data tersinkron real-time', 'success');
+
+        const connectBtn    = document.getElementById('btnConnectFirebase');
+        const disconnectBtn = document.getElementById('btnDisconnectFirebase');
+        const urlInput      = document.getElementById('firebaseDbUrl');
+        if (connectBtn)    connectBtn.style.display    = 'none';
+        if (disconnectBtn) disconnectBtn.style.display = 'inline-flex';
+        if (urlInput)      urlInput.disabled           = true;
+      }).catch(err => {
+        setSyncOnline(false);
+        showToast('Gagal terhubung ke Firebase: ' + err.message, 'error');
+      });
+
+    } catch(err) {
+      setSyncOnline(false);
+      showToast('Error Firebase: ' + err.message, 'error');
+    }
+  }
+
+  function disconnectFirebase() {
+    if (_fbRef) { try { _fbRef.off(); } catch(e) {} }
+    if (_fbApp) { try { _fbApp.delete(); } catch(e) {} }
+    _fbApp = null; _fbDb = null; _fbRef = null;
+    localStorage.removeItem(FIREBASE_CFG_KEY);
+    setSyncOnline(false);
+    showToast('Cloud Sync diputuskan. Data tetap tersimpan lokal.', 'info');
+    const connectBtn    = document.getElementById('btnConnectFirebase');
+    const disconnectBtn = document.getElementById('btnDisconnectFirebase');
+    const urlInput      = document.getElementById('firebaseDbUrl');
+    if (connectBtn)    connectBtn.style.display    = 'inline-flex';
+    if (disconnectBtn) disconnectBtn.style.display = 'none';
+    if (urlInput)      urlInput.disabled           = false;
+  }
+
+  // Merge remote + local: remote history wins, local session wins
+  function mergeStates(local, remote) {
+    if (!remote) return local;
+    const merged = JSON.parse(JSON.stringify(remote));
+    // Keep the local current session if it has more entries
+    const ls = local.currentSession;
+    const rs = remote.currentSession;
+    if (ls && rs && ls.date === rs.date) {
+      // Merge by id uniqueness
+      function mergeArr(a, b) {
+        const map = {};
+        (a || []).forEach(x => { if (x.id) map[x.id] = x; });
+        (b || []).forEach(x => { if (x.id) map[x.id] = x; });
+        return Object.values(map);
+      }
+      merged.currentSession = {
+        date:         ls.date,
+        modals:       mergeArr(ls.modals, rs.modals),
+        transactions: mergeArr(ls.transactions, rs.transactions),
+        proxy:        mergeArr(ls.proxy, rs.proxy),
+      };
+    } else if (ls && (!rs || ls.date > (rs?.date || ''))) {
+      merged.currentSession = ls;
+    }
+    // Keep local rate if it was saved more recently (simple: take max take/setor)
+    if (local.rate) merged.rate = local.rate;
+    return merged;
+  }
+
+  // ── COPY / PASTE DATA (manual device transfer) ──
+  function dataToShareCode() {
+    const payload = JSON.stringify(state);
+    return btoa(unescape(encodeURIComponent(payload)));
+  }
+
+  function applyShareCode(code) {
+    try {
+      const payload = decodeURIComponent(escape(atob(code.trim())));
+      const remote  = JSON.parse(payload);
+      state = mergeStates(state, remote);
+      saveState();
+      renderAll();
+      showToast('✅ Data berhasil dimuat dari kode! Total transaksi diperbarui.', 'success');
+      return true;
+    } catch(e) {
+      showToast('Kode data tidak valid. Pastikan kamu menyalin seluruh kode.', 'error');
+      return false;
+    }
+  }
+
+  // ── BACKUP / RESTORE (JSON file) ──
+  function exportJson() {
+    const data = JSON.stringify(state, null, 2);
+    const blob = new Blob([data], { type: 'application/json' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `ptmakmur_backup_${todayStr()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('💾 File cadangan berhasil diunduh!', 'success');
+  }
+
+  function importJson(file) {
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const remote = JSON.parse(e.target.result);
+        state = mergeStates(state, remote);
+        saveState();
+        renderAll();
+        showToast('📂 File cadangan berhasil dimuat!', 'success');
+      } catch(err) {
+        showToast('File tidak valid atau rusak.', 'error');
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  // ── INIT CLOUD SYNC UI ──
+  function initCloudSync() {
+    const overlay        = document.getElementById('cloudSyncModalOverlay');
+    const closeBtn       = document.getElementById('btnCloseCloudSync');
+    const connectBtn     = document.getElementById('btnConnectFirebase');
+    const disconnectBtn  = document.getElementById('btnDisconnectFirebase');
+    const urlInput       = document.getElementById('firebaseDbUrl');
+    const topbarSyncBtn  = document.getElementById('topbarSyncBtn');
+    const navSyncBtn     = document.getElementById('navBtnCloudSync');
+    const copyBtn        = document.getElementById('btnCopyDataCode');
+    const pasteArea      = document.getElementById('pasteDataCode');
+    const applyBtn       = document.getElementById('btnApplyDataCode');
+    const exportBtn      = document.getElementById('btnExportJson');
+    const importInput    = document.getElementById('importJsonInput');
+
+    function openModal() {
+      if (overlay) {
+        overlay.classList.add('show');
+        // Fill saved URL
+        const saved = localStorage.getItem(FIREBASE_CFG_KEY);
+        if (urlInput && saved) urlInput.value = saved;
+      }
+    }
+    function closeModal() { if (overlay) overlay.classList.remove('show'); }
+
+    topbarSyncBtn?.addEventListener('click', openModal);
+    navSyncBtn?.addEventListener('click', (e) => { e.preventDefault(); openModal(); });
+    closeBtn?.addEventListener('click', closeModal);
+    overlay?.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
+
+    // Tab switching
+    document.querySelectorAll('.sync-tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.sync-tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.sync-tab-content').forEach(c => c.classList.remove('active'));
+        btn.classList.add('active');
+        const target = document.getElementById(btn.dataset.tab);
+        if (target) { target.classList.add('active'); target.style.display = 'block'; }
+      });
+    });
+
+    // Firebase connect
+    connectBtn?.addEventListener('click', () => {
+      const url = urlInput?.value?.trim();
+      connectFirebase(url);
+    });
+    disconnectBtn?.addEventListener('click', disconnectFirebase);
+
+    // Copy data code
+    copyBtn?.addEventListener('click', () => {
+      const code = dataToShareCode();
+      navigator.clipboard?.writeText(code).then(() => {
+        showToast('📋 Kode data disalin! Kirim ke WA/Telegram rekan pendiri.', 'success');
+      }).catch(() => {
+        // Fallback
+        const ta = document.createElement('textarea');
+        ta.value = code;
+        ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        showToast('📋 Kode data disalin!', 'success');
+      });
+    });
+
+    // Apply pasted code
+    applyBtn?.addEventListener('click', () => {
+      const code = pasteArea?.value?.trim();
+      if (!code) { showToast('Kolom kode kosong. Tempel kode dulu!', 'error'); return; }
+      if (applyShareCode(code)) { if (pasteArea) pasteArea.value = ''; }
+    });
+
+    // Export JSON
+    exportBtn?.addEventListener('click', exportJson);
+
+    // Import JSON
+    importInput?.addEventListener('change', (e) => {
+      const file = e.target.files?.[0];
+      if (file) { importJson(file); e.target.value = ''; }
+    });
+
+    // Auto-reconnect if URL was saved previously
+    const savedUrl = localStorage.getItem(FIREBASE_CFG_KEY);
+    if (savedUrl) {
+      setTimeout(() => connectFirebase(savedUrl), 1500);
+    }
+  }
+
+  // ── PATCH saveState to also sync ──
+  // We override the module-level saveState after the fact
+  // by wrapping it in startApp.
+
   // Run after DOM ready
   function startApp() {
     init();
     initFounderCarousel();
     initLogin();
     checkAuthOnLoad();
+    initCloudSync();
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', startApp);
