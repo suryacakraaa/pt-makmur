@@ -1239,7 +1239,14 @@
         transactions: [],
         proxy: [],
       };
+      // Mark reset time — fetchMongoState uses this to avoid overwriting with stale remote data
+      state._sessionResetAt = Date.now();
+      // Pause polling briefly so push can win the race
+      _pauseRemoteWrite = true;
       saveState();
+      _pauseRemoteWrite = false;
+      // Force push new empty state to MongoDB immediately
+      pushMongoState(state);
       showToast('Sesi baru dimulai! Data lama tersimpan di Riwayat.', 'success');
       navigateTo('dashboard');
     });
@@ -1485,7 +1492,17 @@
           localProxy.some(p => !remoteProxy.some(rp => rp.id === p.id))
         );
 
-        if (hasNewLocalData) {
+        // Guard: if local just did a session reset (newer _sessionResetAt than remote),
+        // NEVER pull remote old data — always push our new empty state instead.
+        const localResetAt  = state._sessionResetAt || 0;
+        const remoteResetAt = data.state?._sessionResetAt || 0;
+        const localJustReset = localResetAt > remoteResetAt;
+
+        if (localJustReset) {
+          // We just started a new session — push our clean state, ignore old remote data
+          pushMongoState(state);
+          if (isUserTriggered) showToast('✅ Sesi baru tersinkron ke MongoDB!', 'success');
+        } else if (hasNewLocalData) {
           // Device has offline/unsynced local entries -> merge and push to MongoDB Atlas!
           state = mergeStates(state, data.state);
           try { localStorage.setItem('ptmakmur_v2', JSON.stringify(state)); } catch(e) {}
