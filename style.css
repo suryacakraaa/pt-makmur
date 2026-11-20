@@ -432,9 +432,9 @@ body::after {
 /* Character image inside avatar */
 .founder-avatar-img {
   width: 100%;
-  height: 130%;
+  height: 100%;
   object-fit: cover;
-  object-position: center 15%;
+  object-position: center;
   display: block;
   image-rendering: auto;
 }
@@ -1322,8 +1322,8 @@ body::after {
     gap: 4px !important;
   }
   .share-item .founder-avatar.sm {
-    width: 24px !important;
-    height: 24px !important;
+    width: 28px !important;
+    height: 28px !important;
     font-size: 10px !important;
     border-radius: 6px !important;
   }

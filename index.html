@@ -8,7 +8,7 @@
   <meta http-equiv="Expires" content="0" />
   <title>PT MAKMUR — Growtopia Finance Tracker</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%236366f1'/><text x='50' y='72' text-anchor='middle' font-size='60' font-weight='900' fill='white' font-family='Arial'>M</text></svg>"/>
-  <link rel="stylesheet" href="style.css?v=3.2.0" />
+  <link rel="stylesheet" href="style.css?v=3.3.0" />
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet"/>
@@ -263,21 +263,27 @@
           <div class="profit-share-label">Bagi 3 Pendiri</div>
           <div class="profit-shares">
             <div class="share-item">
-              <div class="founder-avatar surcak sm">S</div>
+              <div class="founder-avatar surcak sm">
+                <img src="icons/founders/surcak_avatar.png" class="founder-avatar-img" alt="S" onerror="this.style.display='none';this.parentElement.textContent='S'" />
+              </div>
               <div>
                 <div class="share-name">SURCAK</div>
                 <div class="share-val" id="share-surcak">0 BGL</div>
               </div>
             </div>
             <div class="share-item">
-              <div class="founder-avatar visuna sm">V</div>
+              <div class="founder-avatar visuna sm">
+                <img src="icons/founders/visuna_avatar.jpg" class="founder-avatar-img" alt="V" onerror="this.style.display='none';this.parentElement.textContent='V'" />
+              </div>
               <div>
                 <div class="share-name">VISUNA</div>
                 <div class="share-val" id="share-visuna">0 BGL</div>
               </div>
             </div>
             <div class="share-item">
-              <div class="founder-avatar avon sm">A</div>
+              <div class="founder-avatar avon sm">
+                <img src="icons/founders/avon_avatar.png" class="founder-avatar-img" alt="A" onerror="this.style.display='none';this.parentElement.textContent='A'" />
+              </div>
               <div>
                 <div class="share-name">AVON</div>
                 <div class="share-val" id="share-avon">0 BGL</div>
@@ -424,7 +430,9 @@
         <div class="form-title">REKAP MODAL HARI INI</div>
         <div class="modal-recap">
           <div class="modal-recap-item">
-            <div class="founder-avatar surcak sm">S</div>
+            <div class="founder-avatar surcak sm">
+              <img src="icons/founders/surcak_avatar.png" class="founder-avatar-img" alt="S" onerror="this.style.display='none';this.parentElement.textContent='S'" />
+            </div>
             <div class="recap-info">
               <span class="recap-name">SURCAK</span>
               <span class="recap-amount" id="recap-surcak">0 BGL</span>
@@ -432,7 +440,9 @@
             <span class="recap-status" id="status-surcak">⏳</span>
           </div>
           <div class="modal-recap-item">
-            <div class="founder-avatar visuna sm">V</div>
+            <div class="founder-avatar visuna sm">
+              <img src="icons/founders/visuna_avatar.jpg" class="founder-avatar-img" alt="V" onerror="this.style.display='none';this.parentElement.textContent='V'" />
+            </div>
             <div class="recap-info">
               <span class="recap-name">VISUNA</span>
               <span class="recap-amount" id="recap-visuna">0 BGL</span>
@@ -440,7 +450,9 @@
             <span class="recap-status" id="status-visuna">⏳</span>
           </div>
           <div class="modal-recap-item">
-            <div class="founder-avatar avon sm">A</div>
+            <div class="founder-avatar avon sm">
+              <img src="icons/founders/avon_avatar.png" class="founder-avatar-img" alt="A" onerror="this.style.display='none';this.parentElement.textContent='A'" />
+            </div>
             <div class="recap-info">
               <span class="recap-name">AVON</span>
               <span class="recap-amount" id="recap-avon">0 BGL</span>
@@ -922,7 +934,7 @@
 <!-- TOAST NOTIFICATION -->
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=3.2.0"></script>
-<script src="galaxy.js?v=3.2.0"></script>
+<script src="app.js?v=3.3.0"></script>
+<script src="galaxy.js?v=3.3.0"></script>
 </body>
 </html>

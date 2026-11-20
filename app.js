@@ -11,6 +11,11 @@
   const PROXY_HOURS_PER_SESSION = 3;
   const DEFAULT_MODAL_PER_FOUNDER = 5;   // BGL
   const FOUNDERS = ['SURCAK', 'VISUNA', 'AVON'];
+  const FOUNDER_AVATARS = {
+    SURCAK: 'icons/founders/surcak_avatar.png',
+    VISUNA: 'icons/founders/visuna_avatar.jpg',
+    AVON:   'icons/founders/avon_avatar.png'
+  };
 
   const CURRENCY_IMG = {
     BGL: 'icons/bgl.png',
@@ -505,7 +510,9 @@
             <div style="display:flex;gap:16px;flex-wrap:wrap;">
               ${FOUNDERS.map((f,i) => `
                 <div style="display:flex;align-items:center;gap:8px;">
-                  <div class="founder-avatar ${f.toLowerCase()} sm">${f[0]}</div>
+                  <div class="founder-avatar ${f.toLowerCase()} sm">
+                    <img src="${FOUNDER_AVATARS[f]}" class="founder-avatar-img" alt="${f[0]}" onerror="this.style.display='none';this.parentElement.textContent='${f[0]}'" />
+                  </div>
                   <div>
                     <div style="font-size:10px;color:var(--text-muted)">${f}</div>
                     <div style="font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:700;color:${net >= 0 ? 'var(--green-light)' : 'var(--red-light)'}">${net >= 0 ? '+' : ''}${(net/3).toFixed(4)} BGL</div>
