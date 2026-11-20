@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>PT MAKMUR — Growtopia Finance Tracker</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%236366f1'/><text x='50' y='72' text-anchor='middle' font-size='60' font-weight='900' fill='white' font-family='Arial'>M</text></svg>"/>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+</head>
+<body>
+
+<!-- ░░░ LOGIN / AUTH SCREEN ░░░ -->
+<div class="login-screen" id="loginScreen">
+  <div class="login-card">
+    <div class="login-logo-wrap">
+      <div class="logo-icon-lg">
+        <svg width="46" height="46" viewBox="0 0 28 28" fill="none">
+          <rect width="28" height="28" rx="8" fill="url(#loginLogoGrad)"/>
+          <text x="14" y="20" text-anchor="middle" font-size="16" font-weight="bold" fill="white">M</text>
+          <defs>
+            <linearGradient id="loginLogoGrad" x1="0" y1="0" x2="28" y2="28">
+              <stop offset="0%" stop-color="#6366f1"/>
+              <stop offset="100%" stop-color="#8b5cf6"/>
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
+      <div class="login-brand-title">PT MAKMUR</div>
+      <div class="login-brand-subtitle">GROWTOPIA FINANCE SYSTEM</div>
+    </div>
+
+    <div class="login-badge-secure">
+      <span>🔒</span>
+      <span>Autentikasi Internal PT MAKMUR</span>
+    </div>
+
+    <form id="loginForm" class="login-form" autocomplete="off" onsubmit="return false;">
+      <div class="form-group" style="margin-bottom:14px;">
+        <label for="loginUsername" style="font-size:12px;font-weight:600;margin-bottom:6px;display:block;">Username</label>
+        <div class="input-with-icon">
+          <span class="input-icon">👤</span>
+          <input type="text" id="loginUsername" class="form-control login-input" placeholder="Masukkan username" required autocomplete="username" />
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-bottom:14px;">
+        <label for="loginPassword" style="font-size:12px;font-weight:600;margin-bottom:6px;display:block;">Password</label>
+        <div class="input-with-icon">
+          <span class="input-icon">🔑</span>
+          <input type="password" id="loginPassword" class="form-control login-input" placeholder="Masukkan password" required autocomplete="current-password" />
+          <button type="button" id="btnTogglePassword" class="btn-toggle-pwd" title="Lihat/Sembunyikan Password">👁️</button>
+        </div>
+      </div>
+
+      <div class="login-options">
+        <label class="remember-label">
+          <input type="checkbox" id="loginRemember" checked />
+          <span>Ingat sesi ini di perangkat ini</span>
+        </label>
+      </div>
+
+      <div class="login-error-msg" id="loginError" style="display:none;">
+        <span>⚠️</span>
+        <span id="loginErrorText">Username atau password salah!</span>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-block btn-login" id="btnLogin">
+        <span>Masuk ke Dashboard</span>
+        <span style="font-size:16px;">🚀</span>
+      </button>
+    </form>
+
+    <div class="login-footer">
+      <span>Founders: <strong>SURCAK</strong> · <strong>VISUNA</strong> · <strong>AVON</strong></span>
+    </div>
+  </div>
+</div>
+
+<!-- ░░░ SIDEBAR ░░░ -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-header">
+    <div class="logo">
+      <div class="logo-icon">
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+          <rect width="28" height="28" rx="8" fill="url(#logoGrad)"/>
+          <text x="14" y="20" text-anchor="middle" font-size="16" font-weight="bold" fill="white">M</text>
+          <defs>
+            <linearGradient id="logoGrad" x1="0" y1="0" x2="28" y2="28">
+              <stop offset="0%" stop-color="#6366f1"/>
+              <stop offset="100%" stop-color="#8b5cf6"/>
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
+      <div class="logo-text">
+        <span class="logo-name">PT MAKMUR</span>
+        <span class="logo-sub">Growtopia Finance</span>
+      </div>
+    </div>
+    <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle sidebar">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+      </svg>
+    </button>
+  </div>
+
+  <nav class="sidebar-nav">
+    <div class="nav-label">Main</div>
+    <a href="#" class="nav-item active" data-page="dashboard">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+        <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+      </svg>
+      <span>Dashboard</span>
+    </a>
+    <a href="#" class="nav-item" data-page="modal">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>
+      </svg>
+      <span>Catat Modal</span>
+    </a>
+    <a href="#" class="nav-item" data-page="transaksi">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>
+      </svg>
+      <span>Pemasukan / Pengeluaran</span>
+    </a>
+    <a href="#" class="nav-item" data-page="proxy">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/>
+      </svg>
+      <span>Biaya Proxy</span>
+    </a>
+    <a href="#" class="nav-item" data-page="rate">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+      </svg>
+      <span>Rate BGL</span>
+    </a>
+    <div class="nav-label" style="margin-top:16px;">Laporan</div>
+    <a href="#" class="nav-item" data-page="history">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+      </svg>
+      <span>Riwayat Harian</span>
+    </a>
+    <div class="nav-label" style="margin-top:16px;">Keamanan</div>
+    <a href="#" class="nav-item nav-logout" id="btnLogout" title="Kunci Dashboard">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+      </svg>
+      <span>Kunci Dashboard</span>
+    </a>
+  </nav>
+</aside>
+
+<!-- ░░░ MAIN ░░░ -->
+<main class="main-content" id="mainContent">
+  <header class="topbar">
+    <div class="topbar-left">
+      <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Open sidebar">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+      </button>
+      <div class="topbar-title" id="topbarTitle">Dashboard</div>
+    </div>
+    <div class="topbar-right">
+      <div class="date-badge">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+        </svg>
+        <span id="currentDate"></span>
+      </div>
+      <button class="btn-new-session" id="btnNewSession">+ Sesi Baru</button>
+    </div>
+  </header>
+
+  <!-- ░░░ PAGE: DASHBOARD ░░░ -->
+  <section class="page active" id="page-dashboard">
+    <!-- ░░░ 3D PARTICLE SPIRAL GALAXY BACKGROUND ░░░ -->
+    <div class="galaxy-universe" aria-hidden="true">
+      <canvas id="galaxy-canvas"></canvas>
+      <div class="galaxy-cosmic-vignette"></div>
+    </div>
+
+    <div class="page-hero">
+      <h1 class="page-title">Overview Harian</h1>
+      <p class="page-subtitle">Rekap keuangan PT MAKMUR hari ini</p>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="stats-grid">
+      <div class="stat-card card-modal">
+        <div class="stat-icon">
+          <img src="icons/bgl.png" class="gt-currency-img" alt="BGL" />
+        </div>
+        <div class="stat-info">
+          <span class="stat-label">Total Modal</span>
+          <span class="stat-value" id="dash-modal">0 BGL</span>
+          <span class="stat-sub" id="dash-modal-idr">≈ Rp 0</span>
+        </div>
+        <div class="stat-trend positive" id="dash-modal-trend">3 setoran</div>
+      </div>
+      <div class="stat-card card-income">
+        <div class="stat-icon">📈</div>
+        <div class="stat-info">
+          <span class="stat-label">Total Pemasukan</span>
+          <span class="stat-value" id="dash-income">0 BGL</span>
+          <span class="stat-sub" id="dash-income-idr">≈ Rp 0</span>
+        </div>
+      </div>
+      <div class="stat-card card-expense">
+        <div class="stat-icon">📉</div>
+        <div class="stat-info">
+          <span class="stat-label">Total Pengeluaran</span>
+          <span class="stat-value" id="dash-expense">0 BGL</span>
+          <span class="stat-sub" id="dash-expense-idr">≈ Rp 0</span>
+        </div>
+      </div>
+      <div class="stat-card card-proxy">
+        <div class="stat-icon">
+          <img src="icons/immortal_proxy.png" class="proxy-img-icon" alt="Immortal Proxy" />
+        </div>
+        <div class="stat-info">
+          <span class="stat-label">Biaya Proxy</span>
+          <span class="stat-value" id="dash-proxy">Rp 0</span>
+          <span class="stat-sub" id="dash-proxy-sessions">0 sesi</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Profit Section -->
+    <div class="profit-section">
+      <div class="profit-card" id="profitCard">
+        <div class="profit-left">
+          <div class="profit-label">Net Profit / Loss Hari Ini</div>
+          <div class="profit-value" id="profitValue">0 BGL</div>
+          <div class="profit-idr" id="profitIdr">≈ Rp 0</div>
+        </div>
+        <div class="profit-right">
+          <div class="profit-share-label">Bagi 3 Pendiri</div>
+          <div class="profit-shares">
+            <div class="share-item">
+              <div class="founder-avatar surcak sm">S</div>
+              <div>
+                <div class="share-name">SURCAK</div>
+                <div class="share-val" id="share-surcak">0 BGL</div>
+              </div>
+            </div>
+            <div class="share-item">
+              <div class="founder-avatar visuna sm">V</div>
+              <div>
+                <div class="share-name">VISUNA</div>
+                <div class="share-val" id="share-visuna">0 BGL</div>
+              </div>
+            </div>
+            <div class="share-item">
+              <div class="founder-avatar avon sm">A</div>
+              <div>
+                <div class="share-name">AVON</div>
+                <div class="share-val" id="share-avon">0 BGL</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Recent Transactions -->
+    <div class="section-block">
+      <div class="section-header">
+        <h3 class="section-title">Transaksi Terbaru</h3>
+        <button class="btn-link" data-page="transaksi">Lihat Semua →</button>
+      </div>
+      <div class="tx-list" id="dash-tx-list">
+        <div class="tx-empty">Belum ada transaksi hari ini</div>
+      </div>
+    </div>
+
+    <!-- FOUNDER CARDS -->
+    <div class="founders-section">
+      <div class="founders-header">
+        <div class="founders-label">THE FOUNDERS</div>
+        <h2 class="founders-title">PT MAKMUR</h2>
+      </div>
+      <div class="founders-carousel" id="foundersCarousel">
+        <button class="carousel-btn carousel-prev" id="carouselPrev" aria-label="Previous">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+
+        <!-- CARD 01 — SURCAK -->
+        <div class="founder-card" data-index="0">
+          <div class="founder-card-inner">
+            <div class="founder-card-top">
+              <span class="founder-num">01</span>
+              <span class="founder-team">PT MAKMUR</span>
+            </div>
+            <div class="founder-char-wrap">
+              <img src="icons/founders/surcak.png" class="founder-char-img" alt="SURCAK"
+                onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" />
+              <div class="founder-char-placeholder"><span>?</span></div>
+            </div>
+            <div class="founder-card-bottom">
+              <div class="founder-role-badge">CO-FOUNDER</div>
+              <div class="founder-card-name">SURCAK</div>
+              <div class="founder-card-sub">Growtopia / PT MAKMUR</div>
+            </div>
+            <div class="founder-card-num-bg">SURCAK</div>
+          </div>
+        </div>
+
+        <!-- CARD 02 — VISUNA -->
+        <div class="founder-card" data-index="1">
+          <div class="founder-card-inner">
+            <div class="founder-card-top">
+              <span class="founder-num">02</span>
+              <span class="founder-team">PT MAKMUR</span>
+            </div>
+            <div class="founder-char-wrap">
+              <img src="icons/founders/visuna.png" class="founder-char-img" alt="VISUNA"
+                onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" />
+              <div class="founder-char-placeholder"><span>?</span></div>
+            </div>
+            <div class="founder-card-bottom">
+              <div class="founder-role-badge">CO-FOUNDER</div>
+              <div class="founder-card-name">VISUNA</div>
+              <div class="founder-card-sub">Growtopia / PT MAKMUR</div>
+            </div>
+            <div class="founder-card-num-bg">VISUNA</div>
+          </div>
+        </div>
+
+        <!-- CARD 03 — AVON -->
+        <div class="founder-card" data-index="2">
+          <div class="founder-card-inner">
+            <div class="founder-card-top">
+              <span class="founder-num">03</span>
+              <span class="founder-team">PT MAKMUR</span>
+            </div>
+            <div class="founder-char-wrap">
+              <img src="icons/founders/avon.png" class="founder-char-img" alt="AVON"
+                onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" />
+              <div class="founder-char-placeholder"><span>?</span></div>
+            </div>
+            <div class="founder-card-bottom">
+              <div class="founder-role-badge">CO-FOUNDER</div>
+              <div class="founder-card-name">AVON</div>
+              <div class="founder-card-sub">Growtopia / PT MAKMUR</div>
+            </div>
+            <div class="founder-card-num-bg">AVON</div>
+          </div>
+        </div>
+
+        <button class="carousel-btn carousel-next" id="carouselNext" aria-label="Next">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+      </div>
+      <div class="carousel-dots">
+        <button class="dot" data-dot="0" aria-label="SURCAK"></button>
+        <button class="dot active" data-dot="1" aria-label="VISUNA"></button>
+        <button class="dot" data-dot="2" aria-label="AVON"></button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ░░░ PAGE: MODAL ░░░ -->
+  <section class="page" id="page-modal">
+    <div class="page-hero">
+      <h1 class="page-title">Catat Modal</h1>
+      <p class="page-subtitle">Setoran modal harian masing-masing pendiri (default: 5 BGL/orang)</p>
+    </div>
+    <div class="form-grid-2">
+      <div class="card-form">
+        <div class="form-title">INPUT SETORAN MODAL</div>
+        <div class="form-group">
+          <label>Pilih Pendiri</label>
+          <select id="modal-founder" class="form-control">
+            <option value="SURCAK">SURCAK</option>
+            <option value="VISUNA">VISUNA</option>
+            <option value="AVON">AVON</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Jumlah Modal</label>
+          <div class="input-currency-wrap">
+            <input type="number" id="modal-amount" class="form-control" value="5" min="0" step="0.01" />
+            <select id="modal-currency" class="currency-select">
+              <option value="BGL">BGL</option>
+              <option value="DL">DL</option>
+              <option value="WL">WL</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Keterangan (Opsional)</label>
+          <input type="text" id="modal-note" class="form-control" placeholder="Contoh: Setoran modal awal..." />
+        </div>
+        <button class="btn btn-primary btn-block" id="btnAddModal">💾 Simpan Setoran Modal</button>
+      </div>
+
+      <div class="card-form">
+        <div class="form-title">REKAP MODAL HARI INI</div>
+        <div class="modal-recap">
+          <div class="modal-recap-item">
+            <div class="founder-avatar surcak sm">S</div>
+            <div class="recap-info">
+              <span class="recap-name">SURCAK</span>
+              <span class="recap-amount" id="recap-surcak">0 BGL</span>
+            </div>
+            <span class="recap-status" id="status-surcak">⏳</span>
+          </div>
+          <div class="modal-recap-item">
+            <div class="founder-avatar visuna sm">V</div>
+            <div class="recap-info">
+              <span class="recap-name">VISUNA</span>
+              <span class="recap-amount" id="recap-visuna">0 BGL</span>
+            </div>
+            <span class="recap-status" id="status-visuna">⏳</span>
+          </div>
+          <div class="modal-recap-item">
+            <div class="founder-avatar avon sm">A</div>
+            <div class="recap-info">
+              <span class="recap-name">AVON</span>
+              <span class="recap-amount" id="recap-avon">0 BGL</span>
+            </div>
+            <span class="recap-status" id="status-avon">⏳</span>
+          </div>
+          <div class="modal-total-row">
+            <span>Total Modal Hari Ini</span>
+            <span class="modal-total-val" id="modal-total-val">0 BGL</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-block" style="margin-top:24px;">
+      <div class="section-header">
+        <h3 class="section-title">Riwayat Setoran Modal Hari Ini</h3>
+      </div>
+      <div class="tx-list" id="modal-log-list">
+        <div class="tx-empty">Belum ada setoran modal hari ini</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ░░░ PAGE: TRANSAKSI ░░░ -->
+  <section class="page" id="page-transaksi">
+    <div class="page-hero">
+      <h1 class="page-title">Pemasukan &amp; Pengeluaran</h1>
+      <p class="page-subtitle">Catat setiap transaksi harian PT MAKMUR</p>
+    </div>
+    <div class="form-grid-2">
+      <div class="card-form">
+        <div class="form-title">TAMBAH TRANSAKSI</div>
+        <div class="form-group">
+          <label>Jenis Transaksi</label>
+          <div class="type-toggle">
+            <button class="type-btn active income-active" id="btn-income" type="button">📈 Pemasukan</button>
+            <button class="type-btn" id="btn-expense" type="button">📉 Pengeluaran</button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Jumlah</label>
+          <div class="input-currency-wrap">
+            <input type="number" id="tx-amount" class="form-control" placeholder="0" min="0" step="0.0001" />
+            <select id="tx-currency" class="currency-select">
+              <option value="BGL">BGL</option>
+              <option value="DL">DL</option>
+              <option value="WL">WL</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Team</label>
+          <select id="tx-category" class="form-control">
+            <option value="Team Nisa">Team Nisa</option>
+            <option value="Team LV">Team LV</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Keterangan</label>
+          <input type="text" id="tx-note" class="form-control" placeholder="Deskripsi transaksi..." />
+        </div>
+        <button class="btn btn-primary btn-block" id="btnAddTx">➕ Simpan Transaksi</button>
+      </div>
+
+      <div class="card-form">
+        <div class="form-title">RINGKASAN TRANSAKSI HARI INI</div>
+        <div class="summary-row">
+          <div class="summary-icon">📈</div>
+          <div class="summary-info">
+            <div class="summary-label">Total Pemasukan</div>
+            <div class="summary-value green" id="sum-income">0 BGL</div>
+          </div>
+        </div>
+        <div class="summary-row">
+          <div class="summary-icon">📉</div>
+          <div class="summary-info">
+            <div class="summary-label">Total Pengeluaran</div>
+            <div class="summary-value red" id="sum-expense">0 BGL</div>
+          </div>
+        </div>
+        <div class="summary-row">
+          <div class="summary-icon">⚖️</div>
+          <div class="summary-info">
+            <div class="summary-label">Net Transaksi</div>
+            <div class="summary-value" id="sum-net">+0.0000 BGL</div>
+          </div>
+        </div>
+
+        <div class="rate-info-box" style="margin-top:20px;padding:12px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:var(--radius-sm);">
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">Rate Konversi Hari Ini</div>
+          <div style="font-size:13px;color:var(--text-secondary);display:flex;justify-content:space-between;">
+            <span>1 BGL = <strong id="conv-bgl-dl" style="color:var(--text-primary);">100 DL</strong></span>
+            <span>1 DL = <strong id="conv-dl-wl" style="color:var(--text-primary);">100 WL</strong></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-block" style="margin-top:24px;">
+      <div class="section-header">
+        <h3 class="section-title">Daftar Transaksi Hari Ini</h3>
+        <div class="filter-row">
+          <button class="filter-btn active" data-filter="all">Semua</button>
+          <button class="filter-btn" data-filter="income">Pemasukan</button>
+          <button class="filter-btn" data-filter="expense">Pengeluaran</button>
+        </div>
+      </div>
+      <div class="tx-list" id="tx-list">
+        <div class="tx-empty">Belum ada data</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ░░░ PAGE: PROXY ░░░ -->
+  <section class="page" id="page-proxy">
+    <div class="page-hero">
+      <h1 class="page-title">Biaya Proxy</h1>
+      <p class="page-subtitle">Pencatatan penggunaan Immortal Proxy (Min. 3 Jam Rp 60.000, +1 Jam = +Rp 20.000)</p>
+    </div>
+    <div class="form-grid-2">
+      <div class="card-form">
+        <div class="form-title">TAMBAH SESI PROXY</div>
+        <div class="proxy-banner" id="proxy-banner-display">
+          <div class="proxy-icon-wrap" id="proxyIconDisplay">
+            <img src="icons/immortal_proxy.png" class="proxy-banner-img" alt="Immortal Proxy">
+          </div>
+          <div>
+            <div class="proxy-name">Immortal Proxy</div>
+            <div class="proxy-price">Min. 3 Jam = Rp 60.000 (+20k / jam)</div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Durasi Sewa (Minimal 3 Jam)</label>
+          <div class="stepper-wrap">
+            <button class="stepper-btn" id="proxyMinus" type="button">−</button>
+            <input type="number" id="proxy-hours" class="form-control stepper-input" value="3" min="3" max="72" step="1" />
+            <button class="stepper-btn" id="proxyPlus" type="button">+</button>
+          </div>
+          <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">
+            <button type="button" class="btn-preset-proxy active" data-hours="3">3 Jam (60k)</button>
+            <button type="button" class="btn-preset-proxy" data-hours="4">4 Jam (80k)</button>
+            <button type="button" class="btn-preset-proxy" data-hours="5">5 Jam (100k)</button>
+            <button type="button" class="btn-preset-proxy" data-hours="6">6 Jam (120k)</button>
+            <button type="button" class="btn-preset-proxy" data-hours="12">12 Jam (240k)</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Estimasi Biaya &amp; Durasi</label>
+          <div style="display:flex;gap:10px;">
+            <div class="calc-display highlight" id="proxy-calc-price" style="flex:1;">Rp 60.000</div>
+            <div class="calc-display" id="proxy-calc-hours" style="flex:1;">3 Jam</div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Keterangan</label>
+          <input type="text" id="proxy-note" class="form-control" placeholder="Contoh: Sesi sore, transfer BCA..." />
+        </div>
+
+        <!-- BUKTI PEMBAYARAN PROXY -->
+        <div class="form-group">
+          <label>Penyimpanan Bukti Pembayaran Proxy</label>
+          <div class="upload-zone-proof" id="proofUploadZone">
+            <input type="file" id="proxyProofInput" accept="image/*" style="display:none;" />
+            <div id="proofPlaceholder">
+              <div style="font-size:26px;margin-bottom:6px;">🧾</div>
+              <div style="font-weight:600;font-size:13px;color:var(--text-primary);margin-bottom:2px;">Pilih File atau Drag &amp; Drop Bukti Transfer</div>
+              <div style="font-size:11px;color:var(--text-muted);">Format Gambar (PNG, JPG, JPEG)</div>
+            </div>
+            <div id="proofPreviewWrap" style="display:none;position:relative;flex-direction:column;align-items:center;gap:8px;">
+              <img id="proofPreviewImg" src="" style="max-height:120px;max-width:100%;border-radius:8px;border:1px solid var(--border);" alt="Preview Bukti Transfer" />
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span id="proofFileName" style="font-size:11px;color:var(--text-muted);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">bukti.png</span>
+                <button type="button" id="btnRemoveProof" class="btn-danger" style="padding:3px 8px;font-size:11px;border-radius:4px;">✕ Hapus</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <button class="btn btn-primary btn-block" id="btnAddProxy" style="margin-top:16px;">🔥 Tambah Sesi Proxy</button>
+      </div>
+
+      <div class="card-form">
+        <div class="form-title">RINGKASAN PROXY HARI INI</div>
+        <div class="proxy-summary-grid">
+          <div class="proxy-sum-item">
+            <div class="proxy-sum-icon">🔥</div>
+            <div class="proxy-sum-label">Total Sewa</div>
+            <div class="proxy-sum-value" id="ps-sessions">0 Sesi</div>
+          </div>
+          <div class="proxy-sum-item">
+            <div class="proxy-sum-icon">⏱️</div>
+            <div class="proxy-sum-label">Total Durasi</div>
+            <div class="proxy-sum-value" id="ps-duration">0 Jam</div>
+          </div>
+          <div class="proxy-sum-item">
+            <div class="proxy-sum-icon">💰</div>
+            <div class="proxy-sum-label">Total Biaya</div>
+            <div class="proxy-sum-value red" id="ps-cost">Rp 0</div>
+          </div>
+        </div>
+
+        <div class="section-block" style="margin-top:20px;">
+          <div class="section-header">
+            <h3 class="section-title">Riwayat Sesi Proxy Hari Ini</h3>
+          </div>
+          <div class="tx-list" id="proxy-log-list">
+            <div class="tx-empty">Belum ada sesi proxy hari ini</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ░░░ PAGE: RATE ░░░ -->
+  <section class="page" id="page-rate">
+    <div class="page-hero">
+      <h1 class="page-title">Rate BGL</h1>
+      <p class="page-subtitle">Atur konversi mata uang Growtopia &amp; kalkulator spread reseller</p>
+    </div>
+    <div class="form-grid-2">
+      <div class="card-form">
+        <div class="form-title">PENGATURAN RATE CURRENCY</div>
+
+        <!-- STANDAR IN-GAME RATIO -->
+        <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:16px;display:flex;justify-content:space-around;align-items:center;font-size:12px;color:var(--text-secondary);">
+          <div style="display:flex;align-items:center;gap:6px;"><img src="icons/bgl.png" class="gt-currency-img-sm" alt="BGL" /> <strong>1 BGL</strong> = <span style="color:var(--text-primary);font-weight:600;">100 DL</span></div>
+          <div style="color:var(--text-muted);">•</div>
+          <div style="display:flex;align-items:center;gap:6px;"><img src="icons/dl.png" class="gt-currency-img-sm" alt="DL" /> <strong>1 DL</strong> = <span style="color:var(--text-primary);font-weight:600;">100 WL</span></div>
+          <div style="color:var(--text-muted);">•</div>
+          <div style="display:flex;align-items:center;gap:6px;"><img src="icons/wl.png" class="gt-currency-img-sm" alt="WL" /> <strong>1 BGL</strong> = <span style="color:var(--text-primary);font-weight:600;">10.000 WL</span></div>
+        </div>
+
+        <div class="rate-grid">
+          <div class="rate-item">
+            <div class="rate-info">
+              <span class="rate-label"><img src="icons/bgl.png" class="gt-currency-img-sm" alt="BGL" /> Rate 1 BGL</span>
+              <span class="rate-eq">=</span>
+            </div>
+            <div class="rate-input-wrap">
+              <input type="number" id="rate-bgl" class="form-control" value="100000" min="1000" step="500" placeholder="100000" />
+              <span class="rate-unit">IDR</span>
+            </div>
+          </div>
+          <div class="rate-item">
+            <div class="rate-info">
+              <span class="rate-label"><img src="icons/dl.png" class="gt-currency-img-sm" alt="DL" /> Rate 1 DL</span>
+              <span class="rate-eq">=</span>
+            </div>
+            <div class="rate-input-wrap">
+              <input type="number" id="rate-dl" class="form-control" value="1000" readonly style="opacity:0.85;cursor:not-allowed;" title="Otomatis: Rate BGL / 100" />
+              <span class="rate-unit">IDR</span>
+            </div>
+          </div>
+          <div class="rate-item">
+            <div class="rate-info">
+              <span class="rate-label"><img src="icons/wl.png" class="gt-currency-img-sm" alt="WL" /> Rate 1 WL</span>
+              <span class="rate-eq">=</span>
+            </div>
+            <div class="rate-input-wrap">
+              <input type="number" id="rate-wl" class="form-control" value="10" min="0.01" step="0.1" placeholder="10" />
+              <span class="rate-unit">IDR</span>
+            </div>
+          </div>
+        </div>
+        <button class="btn btn-primary btn-block" id="btnSaveRate" style="margin-top:20px;">💾 Simpan Pengaturan Rate</button>
+      </div>
+
+      <div class="card-form">
+        <div class="form-title">KALKULATOR KONVERSI &amp; SPREAD</div>
+        <div class="form-group">
+          <label>Hitung Nilai Cepat</label>
+          <div class="input-currency-wrap">
+            <input type="number" id="conv-amount" class="form-control" value="1" min="0" step="0.01" />
+            <select id="conv-from" class="currency-select">
+              <option value="BGL">BGL</option>
+              <option value="DL">DL</option>
+              <option value="WL">WL</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="conv-result-grid">
+          <div class="conv-result-item"><img src="icons/bgl.png" class="gt-currency-img-sm" alt="BGL" /><span id="conv-to-bgl">1.0000 BGL</span></div>
+          <div class="conv-result-item"><img src="icons/dl.png" class="gt-currency-img-sm" alt="DL" /><span id="conv-to-dl">100.00 DL</span></div>
+          <div class="conv-result-item"><img src="icons/wl.png" class="gt-currency-img-sm" alt="WL" /><span id="conv-to-wl">10.000 WL</span></div>
+          <div class="conv-result-item idr"><span id="conv-to-idr">Rp 100.000</span></div>
+        </div>
+
+        <div class="rate-take-setor-box" style="margin-top:24px;border-top:1px solid var(--border);padding-top:16px;">
+          <div class="form-title" style="font-size:13px;margin-bottom:12px;padding-bottom:8px;">RATE TAKE &amp; SETOR BGL (RESELLER)</div>
+          <div style="display:flex;gap:12px;margin-bottom:12px;">
+            <div style="flex:1;">
+              <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:4px;">TAKE BGL (HARGA BELI PT)</label>
+              <input type="number" id="rate-take" class="form-control" placeholder="Contoh: 100000" />
+            </div>
+            <div style="flex:1;">
+              <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:4px;">SETOR BGL (HARGA JUAL PT)</label>
+              <input type="number" id="rate-setor" class="form-control" placeholder="Contoh: 99000" />
+            </div>
+          </div>
+          <div class="calc-display" id="rate-spread-val" style="font-size:13px;text-align:center;padding:12px;">Spread: -</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ░░░ PAGE: HISTORY ░░░ -->
+  <section class="page" id="page-history">
+    <div class="page-hero">
+      <h1 class="page-title">Riwayat Harian</h1>
+      <p class="page-subtitle">Rekap laporan sesi keuangan per hari</p>
+    </div>
+    <div class="history-controls">
+      <div style="display:flex;gap:10px;align-items:center;">
+        <input type="month" id="history-month" class="form-control" style="width:auto;padding:8px 12px;" />
+      </div>
+      <div style="display:flex;gap:10px;">
+        <button class="btn btn-secondary" id="btnExport">📥 Export Data</button>
+        <button class="btn btn-danger" id="btnClearAll">🗑️ Hapus Semua Data</button>
+      </div>
+    </div>
+    <div class="history-list" id="history-list">
+      <div class="tx-empty">Belum ada riwayat sesi</div>
+    </div>
+  </section>
+
+</main>
+
+<!-- MODAL POPUP DIALOG -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal-box">
+    <div class="modal-icon" id="modalIcon">⚠️</div>
+    <div class="modal-title" id="modalTitle">Konfirmasi</div>
+    <div class="modal-msg" id="modalMsg">Apakah Anda yakin?</div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="modalCancel">Batal</button>
+      <button class="btn btn-danger" id="modalConfirm">Ya, Lanjutkan</button>
+    </div>
+  </div>
+</div>
+
+<!-- NEW SESSION MODAL -->
+<div class="modal-overlay" id="sessionOverlay">
+  <div class="modal-box">
+    <div class="modal-icon">🔄</div>
+    <div class="modal-title">Mulai Sesi Baru?</div>
+    <div class="modal-msg">Sesi hari ini akan disimpan ke riwayat dan data aktif hari ini akan di-reset untuk pencatatan baru.</div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="sessionCancel">Batal</button>
+      <button class="btn btn-primary" id="sessionConfirm">Ya, Mulai Sesi Baru</button>
+    </div>
+  </div>
+</div>
+
+<!-- PROOF IMAGE VIEWER MODAL -->
+<div class="modal-overlay" id="proofModalOverlay">
+  <div class="modal-box" style="max-width:560px;width:95%;padding:22px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;border-bottom:1px solid var(--border);padding-bottom:10px;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:20px;">🧾</span>
+        <div style="font-weight:700;font-size:15px;color:var(--text-primary);" id="proofModalTitle">Bukti Pembayaran Proxy</div>
+      </div>
+      <button type="button" id="btnCloseProofModal" style="background:none;border:none;color:var(--text-muted);font-size:22px;cursor:pointer;line-height:1;transition:var(--transition);">✕</button>
+    </div>
+    <div style="max-height:65vh;overflow:auto;border-radius:10px;background:rgba(0,0,0,0.65);display:flex;align-items:center;justify-content:center;padding:12px;border:1px solid var(--border);">
+      <img id="proofModalImg" src="" style="max-width:100%;max-height:60vh;object-fit:contain;border-radius:6px;" alt="Bukti Transfer" />
+    </div>
+    <div id="proofModalCaption" style="font-size:12px;color:var(--text-muted);margin-top:12px;text-align:center;"></div>
+  </div>
+</div>
+
+<!-- TOAST NOTIFICATION -->
+<div class="toast" id="toast"></div>
+
+<script src="app.js"></script>
+<script src="galaxy.js"></script>
+</body>
+</html>
