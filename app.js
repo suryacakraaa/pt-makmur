@@ -134,8 +134,9 @@
 
     const netBGL   = totalIncomeBGL - totalExpenseBGL;
     const profitBGL = netBGL; // After modal subtracted during split
+    const totalBackpackBGL = totalModalBGL + totalIncomeBGL - totalExpenseBGL;
 
-    return { totalModalBGL, totalIncomeBGL, totalExpenseBGL, totalProxyCost, totalProxySessions, totalProxyHours, netBGL, profitBGL };
+    return { totalModalBGL, totalIncomeBGL, totalExpenseBGL, totalProxyCost, totalProxySessions, totalProxyHours, netBGL, profitBGL, totalBackpackBGL };
   }
 
   // ── NAVIGATION ─────────────────────────────────────
@@ -205,8 +206,9 @@
     const t = computeTotals();
 
     // Cards
-    setInner('dash-modal', `${icon('BGL')} ${t.totalModalBGL.toFixed(2)} BGL`);
-    setInner('dash-modal-idr', `≈ ${formatIDR(toIDR(t.totalModalBGL))}`);
+    setInner('dash-modal', `${icon('BGL')} ${t.totalBackpackBGL.toFixed(4)} BGL`);
+    setInner('dash-modal-idr', `≈ ${formatIDR(toIDR(t.totalBackpackBGL))}`);
+    setInner('dash-modal-info', `Modal: ${t.totalModalBGL.toFixed(2)} BGL`);
     setInner('dash-modal-trend', `${state.currentSession.modals.length} setoran`);
 
     setInner('dash-income', `${icon('BGL')} ${t.totalIncomeBGL.toFixed(4)} BGL`);
@@ -215,8 +217,12 @@
     setInner('dash-expense', `${icon('BGL')} ${t.totalExpenseBGL.toFixed(4)} BGL`);
     setInner('dash-expense-idr', `≈ ${formatIDR(toIDR(t.totalExpenseBGL))}`);
 
+    const rateSetor = state.rate?.setor || 99000;
+    const proxyBGL = rateSetor > 0 ? (t.totalProxyCost / rateSetor) : 0;
+    const proxyDL  = proxyBGL * 100;
     setInner('dash-proxy', formatIDR(t.totalProxyCost));
     setInner('dash-proxy-sessions', `${t.totalProxySessions} sesi (${t.totalProxyHours || 0} jam)`);
+    setInner('dash-proxy-bgl', rateSetor > 0 ? `≈ ${proxyDL.toFixed(1)} DL / ${proxyBGL.toFixed(4)} BGL` : '');
 
     // Profit
     const profitEl = document.getElementById('profitValue');
@@ -306,9 +312,14 @@
 
   function renderProxyPage() {
     const t = computeTotals();
+    const rateSetor = state.rate?.setor || 99000;
+    const totalProxyBGL = rateSetor > 0 ? (t.totalProxyCost / rateSetor) : 0;
+    const totalProxyDL  = totalProxyBGL * 100;
+
     setInner('ps-sessions', `${t.totalProxySessions} Sesi`);
     setInner('ps-duration', `${t.totalProxyHours} Jam`);
     setInner('ps-cost', formatIDR(t.totalProxyCost));
+    setInner('ps-cost-bgl', rateSetor > 0 ? `≈ ${totalProxyDL.toFixed(2)} DL / ${totalProxyBGL.toFixed(4)} BGL` : '');
 
     renderTxList('proxy-log-list', [...state.currentSession.proxy].reverse(), true, 'proxy');
 
@@ -327,6 +338,18 @@
 
     setInner('proxy-calc-hours', `${hours} Jam`);
     setInner('proxy-calc-price', formatIDR(cost));
+
+    // Live DL/BGL converter
+    const rateSetor = state.rate?.setor || 99000;
+    if (rateSetor > 0) {
+      const bgl = cost / rateSetor;
+      const dl  = bgl * 100;
+      setInner('proxy-conv-bgl', `≈ ${bgl.toFixed(4)} BGL`);
+      setInner('proxy-conv-dl',  `≈ ${dl.toFixed(2)} DL`);
+    } else {
+      setInner('proxy-conv-bgl', '—');
+      setInner('proxy-conv-dl', '—');
+    }
 
     // Highlight active preset button
     document.querySelectorAll('.btn-preset-proxy').forEach(btn => {
@@ -568,7 +591,11 @@
       let amountHtml = '';
       let amountClass = '';
       if (type === 'proxy') {
-        amountHtml = `<span class="tx-amount proxy">${formatIDR(item.cost)}</span>`;
+        const rateSetor = state.rate?.setor || 99000;
+        const itemBGL = rateSetor > 0 ? (item.cost / rateSetor) : 0;
+        const itemDL  = itemBGL * 100;
+        const dlStr   = rateSetor > 0 ? `<span style="font-size:10px;color:var(--orange);display:block;">≈ ${itemDL.toFixed(2)} DL / ${itemBGL.toFixed(4)} BGL</span>` : '';
+        amountHtml = `<span class="tx-amount proxy">${formatIDR(item.cost)}${dlStr}</span>`;
       } else if (type === 'modal') {
         amountHtml = `<span class="tx-amount modal">+${formatCurrency(item.amount, item.currency)}</span>`;
       } else {
@@ -997,6 +1024,13 @@
         sidebar.classList.remove('mobile-open');
       }
     });
+  }
+
+  // ── UPDATE DASHBOARD HELPER ─────────────────────────
+  function updateDashboard() {
+    if (document.getElementById('page-dashboard')?.classList.contains('active')) {
+      renderDashboard();
+    }
   }
 
   // ── EXPORT ──────────────────────────────────────────
