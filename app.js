@@ -206,6 +206,156 @@
     el.textContent = d.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   }
 
+  // ── LEADERBOARD LOGIC ────────────────────────────────
+  let currentLeaderboardRange = 'today';
+
+  function getTxFounder(t) {
+    if (!t) return null;
+    if (t.founder && FOUNDERS.includes(t.founder.toUpperCase())) {
+      return t.founder.toUpperCase();
+    }
+    const note = (t.note || '').toUpperCase();
+    for (const f of FOUNDERS) {
+      if (note.includes(f)) return f;
+    }
+    return null;
+  }
+
+  function computeFounderLeaderboard(range = 'today') {
+    const stats = {
+      SURCAK: { founder: 'SURCAK', incomeBGL: 0, expenseBGL: 0, shifts: 0 },
+      VISUNA: { founder: 'VISUNA', incomeBGL: 0, expenseBGL: 0, shifts: 0 },
+      AVON:   { founder: 'AVON',   incomeBGL: 0, expenseBGL: 0, shifts: 0 },
+    };
+
+    const sessions = (range === 'all')
+      ? [...(state.history || []), state.currentSession]
+      : [state.currentSession];
+
+    sessions.forEach(sess => {
+      if (!sess || !sess.transactions) return;
+      sess.transactions.forEach(t => {
+        const f = getTxFounder(t);
+        if (!f || !stats[f]) return;
+        const bgl = toBGL(t.amount, t.currency);
+        if (t.type === 'income') {
+          stats[f].incomeBGL += bgl;
+          stats[f].shifts += 1;
+        } else if (t.type === 'expense') {
+          stats[f].expenseBGL += bgl;
+        }
+      });
+    });
+
+    const list = FOUNDERS.map(f => {
+      const s = stats[f];
+      const profitBGL = s.incomeBGL - s.expenseBGL;
+      return {
+        founder: f,
+        incomeBGL: s.incomeBGL,
+        expenseBGL: s.expenseBGL,
+        profitBGL: profitBGL,
+        shifts: s.shifts
+      };
+    });
+
+    // Urutkan dari profit tertinggi ke terendah
+    list.sort((a, b) => b.profitBGL - a.profitBGL);
+
+    const totalPositiveProfit = list.reduce((acc, curr) => acc + Math.max(0, curr.profitBGL), 0);
+
+    return list.map((item, index) => {
+      const sharePercent = totalPositiveProfit > 0
+        ? ((Math.max(0, item.profitBGL) / totalPositiveProfit) * 100).toFixed(1)
+        : '0.0';
+      return {
+        ...item,
+        rank: index + 1,
+        sharePercent: parseFloat(sharePercent)
+      };
+    });
+  }
+
+  function renderLeaderboard() {
+    const podiumEl = document.getElementById('leaderboardPodium');
+    if (!podiumEl) return;
+
+    const list = computeFounderLeaderboard(currentLeaderboardRange);
+    
+    const rankBadges = {
+      1: { text: '👑 #1 TOP PROFIT', class: 'rank-1' },
+      2: { text: '🥈 #2 RUNNER-UP',  class: 'rank-2' },
+      3: { text: '🥉 #3 CONTENDER',  class: 'rank-3' }
+    };
+
+    podiumEl.innerHTML = list.map(item => {
+      const r = item.rank;
+      const badge = rankBadges[r] || { text: `#${r}`, class: '' };
+      const profitSign = item.profitBGL > 0 ? '+' : '';
+      const profitDL = item.profitBGL * 100;
+      const profitIDR = toIDR(Math.abs(item.profitBGL));
+      const avatarSrc = FOUNDER_AVATARS[item.founder] || 'icons/founders/surcak_avatar.png';
+      
+      return `
+        <div class="lb-card rank-${r}">
+          <div class="lb-card-top">
+            <span class="lb-rank-badge ${badge.class}">${badge.text}</span>
+            <span class="lb-shifts-count">⚡ ${item.shifts} Shift Selesai</span>
+          </div>
+
+          <div class="lb-profile-row">
+            <div class="lb-avatar-wrap">
+              <img src="${avatarSrc}" class="lb-avatar-img" alt="${item.founder}" onerror="this.style.display='none';this.parentElement.textContent='${item.founder[0]}'" />
+            </div>
+            <div class="lb-name-wrap">
+              <div class="lb-founder-name">${item.founder}</div>
+              <div class="lb-founder-role">Co-Founder PT MAKMUR</div>
+            </div>
+          </div>
+
+          <div class="lb-amount-block">
+            <div class="lb-profit-label">PROFIT KONTRIBUSI</div>
+            <div class="lb-profit-val">
+              ${icon('BGL')} ${profitSign}${item.profitBGL.toFixed(4)} BGL
+            </div>
+            <div class="lb-profit-dl">
+              💎 ${profitSign}${profitDL.toFixed(2)} DL
+            </div>
+            <div class="lb-profit-idr">
+              ≈ ${formatIDR(profitIDR)}
+            </div>
+          </div>
+
+          <div>
+            <div class="lb-contrib-row">
+              <span>Share Kontribusi</span>
+              <strong>${item.sharePercent}%</strong>
+            </div>
+            <div class="lb-progress-bar">
+              <div class="lb-progress-fill" style="width: ${Math.max(4, Math.min(100, item.sharePercent))}%;"></div>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    // Update carousel card badges with rank & profit
+    list.forEach(item => {
+      const fName = item.founder;
+      const cards = document.querySelectorAll('.founder-card');
+      cards.forEach(card => {
+        const nameEl = card.querySelector('.founder-card-name');
+        if (nameEl && nameEl.textContent.trim().toUpperCase() === fName) {
+          const badgeEl = card.querySelector('.founder-role-badge');
+          if (badgeEl) {
+            const medal = item.rank === 1 ? '👑' : item.rank === 2 ? '🥈' : '🥉';
+            badgeEl.innerHTML = `${medal} #${item.rank} · +${item.profitBGL.toFixed(2)} BGL`;
+          }
+        }
+      });
+    });
+  }
+
   // ── DASHBOARD ───────────────────────────────────────
   function renderDashboard() {
     const t = computeTotals();
@@ -251,6 +401,9 @@
     // Recent transactions (last 5)
     const all = [...state.currentSession.transactions].reverse().slice(0, 5);
     renderTxList('dash-tx-list', all, true);
+
+    // Render Leaderboard
+    renderLeaderboard();
   }
 
   function setInner(id, html) {
@@ -766,19 +919,55 @@
       const amount   = parseFloat(document.getElementById('tx-amount')?.value);
       const currency = document.getElementById('tx-currency')?.value;
       const category = document.getElementById('tx-category')?.value;
+      const founder  = document.getElementById('tx-founder')?.value;
       const note     = document.getElementById('tx-note')?.value?.trim();
 
       if (!amount || amount <= 0) { showToast('Masukkan jumlah transaksi yang valid', 'error'); return; }
 
+      const resolvedFounder = founder || getTxFounder({ note });
+
       state.currentSession.transactions.push({
-        id: uid(), type: currentTxType, amount, currency, category, note, time: timeNow()
+        id: uid(), type: currentTxType, amount, currency, category, founder: resolvedFounder, note, time: timeNow()
       });
       saveState();
       showToast(`${currentTxType === 'income' ? 'Pemasukan' : 'Pengeluaran'} ${formatCurrency(amount, currency)} dicatat!`, 'success');
 
       document.getElementById('tx-amount').value = '';
       document.getElementById('tx-note').value = '';
+      if (document.getElementById('tx-founder')) document.getElementById('tx-founder').value = '';
       renderTransaksiPage();
+      updateDashboard();
+    });
+
+    // ── QUICK TRANSACTION TAGS ──
+    document.querySelectorAll('.btn-tag').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tag = btn.dataset.tag;
+        const founder = btn.dataset.founder;
+        const noteInput = document.getElementById('tx-note');
+        const founderSelect = document.getElementById('tx-founder');
+        if (noteInput) noteInput.value = tag;
+        if (founderSelect && founder) founderSelect.value = founder;
+        if (tag === 'TAX') {
+          currentTxType = 'expense';
+          document.getElementById('btn-expense')?.classList.add('active', 'expense-active');
+          document.getElementById('btn-income')?.classList.remove('active', 'income-active');
+        } else {
+          currentTxType = 'income';
+          document.getElementById('btn-income')?.classList.add('active', 'income-active');
+          document.getElementById('btn-expense')?.classList.remove('active', 'expense-active');
+        }
+      });
+    });
+
+    // ── LEADERBOARD RANGE TABS ──
+    document.querySelectorAll('.lb-tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.lb-tab').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentLeaderboardRange = btn.dataset.range || 'today';
+        renderLeaderboard();
+      });
     });
 
     // ── FILTER BUTTONS ──
