@@ -27,10 +27,7 @@
   }
 
   // ── STATE ───────────────────────────────────────────
-  // Firebase sync vars — declared here so saveState can reference them
-  let _fbApp            = null;
-  let _fbDb             = null;
-  let _fbRef            = null;
+  // Cloud sync vars — declared here so saveState can reference them
   let _pauseRemoteWrite = false;
 
   let state = loadState();
@@ -68,9 +65,11 @@
   function saveState() {
     try { localStorage.setItem('ptmakmur_v2', JSON.stringify(state)); }
     catch(e) {}
-    // Push to Firebase if connected (defined later in initCloudSync)
-    if (typeof _fbRef !== 'undefined' && _fbRef && typeof _pauseRemoteWrite !== 'undefined' && !_pauseRemoteWrite) {
-      try { _fbRef.set(JSON.parse(JSON.stringify(state))).catch(() => {}); } catch(e2) {}
+    // Push to MongoDB Atlas serverless API if not paused
+    if (typeof _pauseRemoteWrite !== 'undefined' && !_pauseRemoteWrite) {
+      if (typeof pushMongoState === 'function') {
+        pushMongoState(state);
+      }
     }
   }
 
@@ -1143,10 +1142,82 @@
     });
   }
 
-  // ── CLOUD SYNC ──
-  const FIREBASE_CFG_KEY  = 'ptmakmur_firebase_url';
-  // (_fbApp, _fbDb, _fbRef, _pauseRemoteWrite declared at top of module)
+  // ══════════════════════════════════════════════════
+  // CLOUD SYNC — MongoDB Atlas (Live via /api/state)
+  // ══════════════════════════════════════════════════
+  let _lastSyncTime = 0;
+  let _pollTimer    = null;
+  let _isPushing    = false;
 
+  async function pushMongoState(currState) {
+    if (_isPushing || _pauseRemoteWrite) return;
+    _isPushing = true;
+    try {
+      const res = await fetch('/api/state', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ state: currState }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.updatedAt) _lastSyncTime = data.updatedAt;
+        setSyncOnline(true);
+        updateSyncTime();
+      } else {
+        setSyncOnline(false);
+      }
+    } catch(err) {
+      console.warn('Sync push error:', err);
+      setSyncOnline(false);
+    } finally {
+      _isPushing = false;
+    }
+  }
+
+  async function fetchMongoState(isUserTriggered = false) {
+    if (_pauseRemoteWrite || _isPushing) return;
+    try {
+      const res = await fetch('/api/state?t=' + Date.now());
+      if (!res.ok) {
+        setSyncOnline(false);
+        if (isUserTriggered) showToast('Gagal terhubung ke MongoDB server', 'error');
+        return;
+      }
+      const data = await res.json();
+      setSyncOnline(true);
+      updateSyncTime();
+
+      if (data.exists && data.state && data.updatedAt) {
+        if (data.updatedAt > _lastSyncTime) {
+          _lastSyncTime = data.updatedAt;
+          _pauseRemoteWrite = true;
+          state = mergeStates(state, data.state);
+          try { localStorage.setItem('ptmakmur_v2', JSON.stringify(state)); } catch(e) {}
+          renderAll();
+          _pauseRemoteWrite = false;
+          if (isUserTriggered) showToast('✅ Data disinkronkan dari MongoDB Atlas!', 'success');
+        } else if (isUserTriggered) {
+          showToast('Data sudah versi terbaru (up to date)', 'info');
+        }
+      } else if (!data.exists && state) {
+        // First initialization to cloud
+        pushMongoState(state);
+      }
+    } catch(err) {
+      setSyncOnline(false);
+      if (isUserTriggered) showToast('Koneksi offline atau server belum siap', 'error');
+    }
+  }
+
+  function updateSyncTime() {
+    const el = document.getElementById('syncLastUpdate');
+    if (el) {
+      const now = new Date();
+      el.textContent = `Sync: ${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}:${now.getSeconds().toString().padStart(2,'0')}`;
+    }
+  }
+
+  // ── Sync UI state indicators ──
   function getSyncDot()   { return document.getElementById('topbarSyncDot'); }
   function getSyncLabel() { return document.getElementById('topbarSyncLabel'); }
   function getSyncPill()  { return document.getElementById('sidebarSyncPill'); }
@@ -1156,114 +1227,32 @@
     const lbl  = getSyncLabel();
     const pill = getSyncPill();
     if (dot)  { on ? dot.classList.add('online')  : dot.classList.remove('online'); }
-    if (lbl)  { lbl.textContent = on ? '🟢 Tersinkron' : 'Cloud Sync'; }
+    if (lbl)  { lbl.textContent = on ? '🟢 MongoDB Sync' : '🔴 Sync Offline'; }
     if (pill) {
-      pill.textContent = on ? 'Online' : 'Offline';
+      pill.textContent = on ? 'MongoDB Aktif' : 'Offline';
       on ? pill.classList.add('online') : pill.classList.remove('online');
     }
-    // Update modal status
     const dot2 = document.getElementById('syncStatusDot');
     const txt  = document.getElementById('syncStatusText');
     const sub  = document.getElementById('syncStatusSub');
+    const dev  = document.getElementById('mongoDeviceStatus');
     if (dot2) dot2.style.cssText = on
       ? 'width:10px;height:10px;border-radius:50%;background:#22c55e;box-shadow:0 0 10px #22c55e;display:inline-block;'
-      : 'width:10px;height:10px;border-radius:50%;background:#ef4444;box-shadow:0 0 10px #ef4444;display:inline-block;';
-    if (txt) txt.textContent = on ? '✅ Terhubung ke Firebase Cloud' : 'Belum Terhubung ke Cloud';
+      : 'width:10px;height:10px;border-radius:50%;background:#ef4444;box-shadow:0 0 10px #ef4444;display:inline-block;' ;
+    if (txt) txt.textContent = on ? '🟢 MongoDB Atlas Terhubung' : '🔴 Belum Terhubung ke MongoDB';
     if (sub) sub.textContent = on
-      ? 'Data sinkron otomatis antar HP, Laptop, dan semua pendiri. ☁️'
-      : 'Data saat ini tersimpan di memori lokal HP/Laptop ini saja.';
+      ? 'Cluster PTMAKMUR · Database: ptmakmur'
+      : 'Periksa koneksi internet atau pengaturan IP Access di Atlas.';
+    if (dev) dev.textContent = on ? 'Sinkron dengan Cloud (Realtime)' : 'Mode Lokal (Offline)';
   }
 
-  function connectFirebase(url) {
-    if (!url || !url.startsWith('https://')) {
-      showToast('URL Firebase tidak valid! Harus diawali https://', 'error');
-      return;
-    }
-    try {
-      // Destroy previous instance
-      if (_fbApp) {
-        try { _fbApp.delete(); } catch(e) {}
-        _fbApp = null; _fbDb = null; _fbRef = null;
-      }
-
-      const cfg = { databaseURL: url.replace(/\/$/, '') };
-      _fbApp = firebase.initializeApp(cfg, 'ptmakmur_' + Date.now());
-      _fbDb  = firebase.database(_fbApp);
-      _fbRef = _fbDb.ref('ptmakmur/state');
-
-      // On connect, push current local state first, then listen
-      _fbRef.once('value').then(snap => {
-        const remote = snap.val();
-        if (remote) {
-          // Merge: remote wins for history, local wins for today session
-          const merged = mergeStates(state, remote);
-          _pauseRemoteWrite = true;
-          state = merged;
-          saveState();
-          renderAll();
-          _pauseRemoteWrite = false;
-        }
-        // Write local state to cloud
-        _fbRef.set(JSON.parse(JSON.stringify(state)));
-
-        // Listen for changes from other devices
-        _fbRef.on('value', snap => {
-          if (_pauseRemoteWrite) return;
-          const remote = snap.val();
-          if (!remote) return;
-          const merged = mergeStates(state, remote);
-          _pauseRemoteWrite = true;
-          state = merged;
-          saveState();
-          renderAll();
-          _pauseRemoteWrite = false;
-        });
-
-        setSyncOnline(true);
-        localStorage.setItem(FIREBASE_CFG_KEY, url);
-        showToast('☁️ Cloud Sync aktif! Data tersinkron real-time', 'success');
-
-        const connectBtn    = document.getElementById('btnConnectFirebase');
-        const disconnectBtn = document.getElementById('btnDisconnectFirebase');
-        const urlInput      = document.getElementById('firebaseDbUrl');
-        if (connectBtn)    connectBtn.style.display    = 'none';
-        if (disconnectBtn) disconnectBtn.style.display = 'inline-flex';
-        if (urlInput)      urlInput.disabled           = true;
-      }).catch(err => {
-        setSyncOnline(false);
-        showToast('Gagal terhubung ke Firebase: ' + err.message, 'error');
-      });
-
-    } catch(err) {
-      setSyncOnline(false);
-      showToast('Error Firebase: ' + err.message, 'error');
-    }
-  }
-
-  function disconnectFirebase() {
-    if (_fbRef) { try { _fbRef.off(); } catch(e) {} }
-    if (_fbApp) { try { _fbApp.delete(); } catch(e) {} }
-    _fbApp = null; _fbDb = null; _fbRef = null;
-    localStorage.removeItem(FIREBASE_CFG_KEY);
-    setSyncOnline(false);
-    showToast('Cloud Sync diputuskan. Data tetap tersimpan lokal.', 'info');
-    const connectBtn    = document.getElementById('btnConnectFirebase');
-    const disconnectBtn = document.getElementById('btnDisconnectFirebase');
-    const urlInput      = document.getElementById('firebaseDbUrl');
-    if (connectBtn)    connectBtn.style.display    = 'inline-flex';
-    if (disconnectBtn) disconnectBtn.style.display = 'none';
-    if (urlInput)      urlInput.disabled           = false;
-  }
-
-  // Merge remote + local: remote history wins, local session wins
+  // ── Merge remote + local: deduplicate by id ──
   function mergeStates(local, remote) {
     if (!remote) return local;
     const merged = JSON.parse(JSON.stringify(remote));
-    // Keep the local current session if it has more entries
     const ls = local.currentSession;
     const rs = remote.currentSession;
     if (ls && rs && ls.date === rs.date) {
-      // Merge by id uniqueness
       function mergeArr(a, b) {
         const map = {};
         (a || []).forEach(x => { if (x.id) map[x.id] = x; });
@@ -1279,25 +1268,22 @@
     } else if (ls && (!rs || ls.date > (rs?.date || ''))) {
       merged.currentSession = ls;
     }
-    // Keep local rate if it was saved more recently (simple: take max take/setor)
     if (local.rate) merged.rate = local.rate;
     return merged;
   }
 
   // ── COPY / PASTE DATA (manual device transfer) ──
   function dataToShareCode() {
-    const payload = JSON.stringify(state);
-    return btoa(unescape(encodeURIComponent(payload)));
+    return btoa(unescape(encodeURIComponent(JSON.stringify(state))));
   }
 
   function applyShareCode(code) {
     try {
-      const payload = decodeURIComponent(escape(atob(code.trim())));
-      const remote  = JSON.parse(payload);
+      const remote = JSON.parse(decodeURIComponent(escape(atob(code.trim()))));
       state = mergeStates(state, remote);
       saveState();
       renderAll();
-      showToast('✅ Data berhasil dimuat dari kode! Total transaksi diperbarui.', 'success');
+      showToast('✅ Data berhasil dimuat dari kode!', 'success');
       return true;
     } catch(e) {
       showToast('Kode data tidak valid. Pastikan kamu menyalin seluruh kode.', 'error');
@@ -1307,16 +1293,12 @@
 
   // ── BACKUP / RESTORE (JSON file) ──
   function exportJson() {
-    const data = JSON.stringify(state, null, 2);
-    const blob = new Blob([data], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement('a');
-    a.href     = url;
-    a.download = `ptmakmur_backup_${todayStr()}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    a.href = url; a.download = `ptmakmur_backup_${todayStr()}.json`;
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a); URL.revokeObjectURL(url);
     showToast('💾 File cadangan berhasil diunduh!', 'success');
   }
 
@@ -1326,8 +1308,7 @@
       try {
         const remote = JSON.parse(e.target.result);
         state = mergeStates(state, remote);
-        saveState();
-        renderAll();
+        saveState(); renderAll();
         showToast('📂 File cadangan berhasil dimuat!', 'success');
       } catch(err) {
         showToast('File tidak valid atau rusak.', 'error');
@@ -1340,9 +1321,7 @@
   function initCloudSync() {
     const overlay        = document.getElementById('cloudSyncModalOverlay');
     const closeBtn       = document.getElementById('btnCloseCloudSync');
-    const connectBtn     = document.getElementById('btnConnectFirebase');
-    const disconnectBtn  = document.getElementById('btnDisconnectFirebase');
-    const urlInput       = document.getElementById('firebaseDbUrl');
+    const forceSyncBtn   = document.getElementById('btnForceSyncMongo');
     const topbarSyncBtn  = document.getElementById('topbarSyncBtn');
     const navSyncBtn     = document.getElementById('navBtnCloudSync');
     const copyBtn        = document.getElementById('btnCopyDataCode');
@@ -1352,82 +1331,80 @@
     const importInput    = document.getElementById('importJsonInput');
 
     function openModal() {
-      if (overlay) {
-        overlay.classList.add('show');
-        // Fill saved URL
-        const saved = localStorage.getItem(FIREBASE_CFG_KEY);
-        if (urlInput && saved) urlInput.value = saved;
-      }
+      if (!overlay) return;
+      overlay.classList.add('show');
+      fetchMongoState(false);
     }
-    function closeModal() { if (overlay) overlay.classList.remove('show'); }
+    function closeModal() { overlay?.classList.remove('show'); }
 
     topbarSyncBtn?.addEventListener('click', openModal);
-    navSyncBtn?.addEventListener('click', (e) => { e.preventDefault(); openModal(); });
+    navSyncBtn?.addEventListener('click', e => { e.preventDefault(); openModal(); });
     closeBtn?.addEventListener('click', closeModal);
-    overlay?.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
+    overlay?.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
 
     // Tab switching
     document.querySelectorAll('.sync-tab-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         document.querySelectorAll('.sync-tab-btn').forEach(b => b.classList.remove('active'));
-        document.querySelectorAll('.sync-tab-content').forEach(c => c.classList.remove('active'));
+        document.querySelectorAll('.sync-tab-content').forEach(c => { c.classList.remove('active'); c.style.display = 'none'; });
         btn.classList.add('active');
         const target = document.getElementById(btn.dataset.tab);
         if (target) { target.classList.add('active'); target.style.display = 'block'; }
       });
     });
 
-    // Firebase connect
-    connectBtn?.addEventListener('click', () => {
-      const url = urlInput?.value?.trim();
-      connectFirebase(url);
+    // Manual Force Sync Button
+    forceSyncBtn?.addEventListener('click', () => {
+      fetchMongoState(true);
     });
-    disconnectBtn?.addEventListener('click', disconnectFirebase);
 
-    // Copy data code
+    // Copy share code
     copyBtn?.addEventListener('click', () => {
       const code = dataToShareCode();
       navigator.clipboard?.writeText(code).then(() => {
-        showToast('📋 Kode data disalin! Kirim ke WA/Telegram rekan pendiri.', 'success');
+        showToast('📋 Kode data disalin! Kirim via WA/Telegram.', 'success');
       }).catch(() => {
-        // Fallback
         const ta = document.createElement('textarea');
-        ta.value = code;
-        ta.style.position = 'fixed'; ta.style.opacity = '0';
-        document.body.appendChild(ta);
-        ta.select();
-        document.execCommand('copy');
+        ta.value = code; ta.style.cssText = 'position:fixed;opacity:0';
+        document.body.appendChild(ta); ta.select(); document.execCommand('copy');
         document.body.removeChild(ta);
         showToast('📋 Kode data disalin!', 'success');
       });
     });
 
-    // Apply pasted code
     applyBtn?.addEventListener('click', () => {
       const code = pasteArea?.value?.trim();
-      if (!code) { showToast('Kolom kode kosong. Tempel kode dulu!', 'error'); return; }
-      if (applyShareCode(code)) { if (pasteArea) pasteArea.value = ''; }
+      if (!code) { showToast('Kolom kode kosong!', 'error'); return; }
+      if (applyShareCode(code)) pasteArea.value = '';
     });
 
-    // Export JSON
     exportBtn?.addEventListener('click', exportJson);
-
-    // Import JSON
-    importInput?.addEventListener('change', (e) => {
-      const file = e.target.files?.[0];
-      if (file) { importJson(file); e.target.value = ''; }
+    importInput?.addEventListener('change', e => {
+      const f = e.target.files?.[0];
+      if (f) { importJson(f); e.target.value = ''; }
     });
 
-    // Auto-reconnect if URL was saved previously
-    const savedUrl = localStorage.getItem(FIREBASE_CFG_KEY);
-    if (savedUrl) {
-      setTimeout(() => connectFirebase(savedUrl), 1500);
-    }
+    // Start background auto-poll every 4 seconds
+    if (_pollTimer) clearInterval(_pollTimer);
+    _pollTimer = setInterval(() => fetchMongoState(false), 4000);
+
+    // Sync on tab focus
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        fetchMongoState(false);
+      }
+    });
+
+    // Initial fetch on app start
+    setTimeout(() => fetchMongoState(false), 500);
   }
 
-  // ── PATCH saveState to also sync ──
-  // We override the module-level saveState after the fact
-  // by wrapping it in startApp.
+  // ── PATCH saveState: also push to MongoDB on every save ──
+  // (saveState already checks _fbRef from top of module,
+  //  we now also push to Mongo if connected)
+  // Override is handled by augmenting saveState in-place via the
+  // _mongoAppId/_mongoApiKey checks inside saveState itself:
+  // (see saveState definition above which calls mongoWrite if connected)
 
   // Run after DOM ready
   function startApp() {
