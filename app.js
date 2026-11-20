@@ -37,9 +37,16 @@
 
   let state = loadState();
 
+  function generateSessionId() {
+    return 'sess_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+  }
+
   function defaultState() {
+    const now = Date.now();
     return {
       currentSession: {
+        id: generateSessionId(),
+        createdAt: now,
         date: todayStr(),
         modals: [],       // { founder, amount, currency, note, time }
         transactions: [], // { type, amount, currency, category, note, time }
@@ -48,6 +55,7 @@
       rate: { BGL: 100000, DL: 1000, WL: 10, take: 100000, setor: 99000 },
       history: [],  // array of session snapshots
       proxyIconUrl: null,
+      _sessionResetAt: now,
     };
   }
 
@@ -61,6 +69,10 @@
         }
         if (!s.rate.take) s.rate.take = 100000;
         if (!s.rate.setor) s.rate.setor = 99000;
+        if (s.currentSession && !s.currentSession.id) {
+          s.currentSession.id = generateSessionId();
+          s.currentSession.createdAt = Date.now();
+        }
         return s;
       }
     } catch(e) {}
@@ -1227,26 +1239,70 @@
     document.getElementById('sessionCancel')?.addEventListener('click', () => {
       document.getElementById('sessionOverlay').classList.remove('show');
     });
-    document.getElementById('sessionConfirm')?.addEventListener('click', () => {
-      document.getElementById('sessionOverlay').classList.remove('show');
-      // Save current session to history
-      const snap = JSON.parse(JSON.stringify(state.currentSession));
-      state.history.push(snap);
-      // Reset current session
+    document.getElementById('sessionConfirm')?.addEventListener('click', async () => {
+      const confirmBtn = document.getElementById('sessionConfirm');
+      if (confirmBtn) {
+        confirmBtn.disabled = true;
+        confirmBtn.textContent = 'Menyimpan Sesi...';
+      }
+
+      // 1. Archive current session to history if it has any entries
+      const cs = state.currentSession || {};
+      const hasContent = (cs.modals?.length > 0 || cs.transactions?.length > 0 || cs.proxy?.length > 0);
+      if (hasContent) {
+        const snap = JSON.parse(JSON.stringify(cs));
+        if (!snap.id) snap.id = generateSessionId();
+        if (!snap.createdAt) snap.createdAt = Date.now();
+        if (!state.history) state.history = [];
+        // Deduplicate in history
+        const alreadyExists = state.history.some(h => h.id === snap.id);
+        if (!alreadyExists) {
+          state.history.push(snap);
+        }
+      }
+
+      // 2. Create brand-new clean session
+      const now = Date.now();
       state.currentSession = {
+        id: generateSessionId(),
+        createdAt: now,
         date: todayStr(),
         modals: [],
         transactions: [],
         proxy: [],
       };
-      // Mark reset time — fetchMongoState uses this to avoid overwriting with stale remote data
-      state._sessionResetAt = Date.now();
-      // Pause polling briefly so push can win the race
+      state._sessionResetAt = now;
+
+      // 3. Save to localStorage immediately
+      try { localStorage.setItem('ptmakmur_v2', JSON.stringify(state)); } catch(e) {}
+
+      // 4. Force push new clean state to MongoDB Atlas and await completion
       _pauseRemoteWrite = true;
-      saveState();
-      _pauseRemoteWrite = false;
-      // Force push new empty state to MongoDB immediately
-      pushMongoState(state);
+      try {
+        const res = await fetch('/api/state', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ state }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.updatedAt) {
+            _lastSyncTime = data.updatedAt;
+            try { localStorage.setItem('ptmakmur_last_sync', String(data.updatedAt)); } catch(e) {}
+          }
+        }
+      } catch(err) {
+        console.warn('Error syncing new session to MongoDB:', err);
+      } finally {
+        _pauseRemoteWrite = false;
+        if (confirmBtn) {
+          confirmBtn.disabled = false;
+          confirmBtn.textContent = 'Ya, Mulai Sesi Baru';
+        }
+      }
+
+      document.getElementById('sessionOverlay').classList.remove('show');
+      renderAll();
       showToast('Sesi baru dimulai! Data lama tersimpan di Riwayat.', 'success');
       navigateTo('dashboard');
     });
@@ -1434,7 +1490,7 @@
   // ══════════════════════════════════════════════════
   // CLOUD SYNC — MongoDB Atlas (Live via /api/state)
   // ══════════════════════════════════════════════════
-  let _lastSyncTime = 0;
+  let _lastSyncTime = parseInt(localStorage.getItem('ptmakmur_last_sync') || '0', 10);
   let _pollTimer    = null;
   let _isPushing    = false;
 
@@ -1449,7 +1505,10 @@
       });
       if (res.ok) {
         const data = await res.json();
-        if (data.updatedAt) _lastSyncTime = data.updatedAt;
+        if (data.updatedAt) {
+          _lastSyncTime = data.updatedAt;
+          try { localStorage.setItem('ptmakmur_last_sync', String(data.updatedAt)); } catch(e) {}
+        }
         setSyncOnline(true);
         updateSyncTime();
       } else {
@@ -1461,6 +1520,16 @@
     } finally {
       _isPushing = false;
     }
+  }
+
+  // Deduplicate history snapshots
+  function deduplicateHistory(histArr) {
+    const map = new Map();
+    (histArr || []).forEach(h => {
+      const key = h.id || (h.date + '_' + (h.transactions?.length || 0) + '_' + (h.modals?.length || 0));
+      map.set(key, h);
+    });
+    return Array.from(map.values());
   }
 
   async function fetchMongoState(isUserTriggered = false) {
@@ -1478,54 +1547,79 @@
       setSyncOnline(true);
 
       if (data.exists && data.state) {
-        // Compare local vs remote to detect if local has unsynced items
-        const localModals  = state.currentSession?.modals || [];
-        const remoteModals = data.state?.currentSession?.modals || [];
-        const localTxs     = state.currentSession?.transactions || [];
-        const remoteTxs    = data.state?.currentSession?.transactions || [];
-        const localProxy   = state.currentSession?.proxy || [];
-        const remoteProxy  = data.state?.currentSession?.proxy || [];
+        const remoteState = data.state;
+        const localSessId  = state.currentSession?.id;
+        const remoteSessId = remoteState.currentSession?.id;
+        const localResetAt  = state._sessionResetAt || state.currentSession?.createdAt || 0;
+        const remoteResetAt = remoteState._sessionResetAt || remoteState.currentSession?.createdAt || 0;
 
-        const hasNewLocalData = (
-          localModals.some(m => !remoteModals.some(rm => rm.id === m.id)) ||
-          localTxs.some(t => !remoteTxs.some(rt => rt.id === t.id)) ||
-          localProxy.some(p => !remoteProxy.some(rp => rp.id === p.id))
-        );
+        // Check if session IDs match
+        const isSameSession = (localSessId && remoteSessId && localSessId === remoteSessId);
 
-        // Guard: if local just did a session reset (newer _sessionResetAt than remote),
-        // NEVER pull remote old data — always push our new empty state instead.
-        const localResetAt  = state._sessionResetAt || 0;
-        const remoteResetAt = data.state?._sessionResetAt || 0;
-        const localJustReset = localResetAt > remoteResetAt;
-
-        if (localJustReset) {
-          // We just started a new session — push our clean state, ignore old remote data
-          pushMongoState(state);
-          if (isUserTriggered) showToast('✅ Sesi baru tersinkron ke MongoDB!', 'success');
-        } else if (hasNewLocalData) {
-          // Device has offline/unsynced local entries -> merge and push to MongoDB Atlas!
-          state = mergeStates(state, data.state);
-          try { localStorage.setItem('ptmakmur_v2', JSON.stringify(state)); } catch(e) {}
-          renderAll();
-          pushMongoState(state);
-          if (isUserTriggered) showToast('✅ Data lokal di-upload ke MongoDB!', 'success');
-        } else if (data.updatedAt && data.updatedAt > _lastSyncTime) {
-          // Cloud has newer data from another device (phone/laptop)!
-          _lastSyncTime = data.updatedAt;
-          _pauseRemoteWrite = true;
-          try {
-            state = mergeStates(state, data.state);
-            localStorage.setItem('ptmakmur_v2', JSON.stringify(state));
-            renderAll();
-          } finally {
-            _pauseRemoteWrite = false;
+        if (!isSameSession) {
+          // Different sessions! One device or cloud reset/started a new session.
+          if (localResetAt > remoteResetAt) {
+            // Local started a brand new session that hasn't reached cloud -> push clean state to cloud
+            pushMongoState(state);
+            if (isUserTriggered) showToast('✅ Sesi baru tersinkron ke MongoDB!', 'success');
+          } else {
+            // Remote has a new session (e.g. from refresh or other device) -> adopt remote session directly!
+            // NEVER merge old local transactions into remote's new session!
+            _pauseRemoteWrite = true;
+            try {
+              state.currentSession = remoteState.currentSession || defaultState().currentSession;
+              state.history = deduplicateHistory([...(state.history || []), ...(remoteState.history || [])]);
+              if (remoteState.rate) state.rate = remoteState.rate;
+              if (remoteState.proxyIconUrl) state.proxyIconUrl = remoteState.proxyIconUrl;
+              state._sessionResetAt = remoteResetAt;
+              _lastSyncTime = data.updatedAt || Date.now();
+              localStorage.setItem('ptmakmur_v2', JSON.stringify(state));
+              localStorage.setItem('ptmakmur_last_sync', String(_lastSyncTime));
+              renderAll();
+            } finally {
+              _pauseRemoteWrite = false;
+            }
+            if (isUserTriggered) showToast('✅ Data disinkronkan dari MongoDB Atlas!', 'success');
           }
-          if (isUserTriggered) showToast('✅ Data disinkronkan dari MongoDB Atlas!', 'success');
-        } else if (isUserTriggered) {
-          showToast('Data sudah versi terbaru (up to date)', 'info');
+        } else {
+          // Both are on the SAME active session!
+          const localModals  = state.currentSession?.modals || [];
+          const remoteModals = remoteState.currentSession?.modals || [];
+          const localTxs     = state.currentSession?.transactions || [];
+          const remoteTxs    = remoteState.currentSession?.transactions || [];
+          const localProxy   = state.currentSession?.proxy || [];
+          const remoteProxy  = remoteState.currentSession?.proxy || [];
+
+          const hasNewLocalData = (
+            localModals.some(m => !remoteModals.some(rm => rm.id === m.id)) ||
+            localTxs.some(t => !remoteTxs.some(rt => rt.id === t.id)) ||
+            localProxy.some(p => !remoteProxy.some(rp => rp.id === p.id))
+          );
+
+          if (hasNewLocalData) {
+            // Device has offline items in current session -> merge and push
+            state = mergeStates(state, remoteState);
+            try { localStorage.setItem('ptmakmur_v2', JSON.stringify(state)); } catch(e) {}
+            renderAll();
+            pushMongoState(state);
+            if (isUserTriggered) showToast('✅ Data lokal di-upload ke MongoDB!', 'success');
+          } else if (data.updatedAt && data.updatedAt > _lastSyncTime) {
+            _lastSyncTime = data.updatedAt;
+            try { localStorage.setItem('ptmakmur_last_sync', String(data.updatedAt)); } catch(e) {}
+            _pauseRemoteWrite = true;
+            try {
+              state = mergeStates(state, remoteState);
+              localStorage.setItem('ptmakmur_v2', JSON.stringify(state));
+              renderAll();
+            } finally {
+              _pauseRemoteWrite = false;
+            }
+            if (isUserTriggered) showToast('✅ Data disinkronkan dari MongoDB Atlas!', 'success');
+          } else if (isUserTriggered) {
+            showToast('Data sudah versi terbaru (up to date)', 'info');
+          }
         }
       } else if (!data.exists && state) {
-        // First initialization to cloud
         pushMongoState(state);
       }
       updateSyncTime();
@@ -1581,7 +1675,9 @@
     const merged = JSON.parse(JSON.stringify(remote));
     const ls = local.currentSession;
     const rs = remote.currentSession;
-    if (ls && rs && ls.date === rs.date) {
+
+    // Only merge items if session IDs match (same session)
+    if (ls && rs && ls.id && rs.id && ls.id === rs.id) {
       function mergeArr(a, b) {
         const map = {};
         (a || []).forEach(x => { if (x.id) map[x.id] = x; });
@@ -1589,15 +1685,23 @@
         return Object.values(map);
       }
       merged.currentSession = {
-        date:         ls.date,
+        id:           ls.id,
+        createdAt:    ls.createdAt || rs.createdAt || Date.now(),
+        date:         ls.date || rs.date,
         modals:       mergeArr(ls.modals, rs.modals),
         transactions: mergeArr(ls.transactions, rs.transactions),
         proxy:        mergeArr(ls.proxy, rs.proxy),
       };
-    } else if (ls && (!rs || ls.date > (rs?.date || ''))) {
-      merged.currentSession = ls;
+    } else {
+      // Different sessions: remote session wins
+      merged.currentSession = rs || ls;
     }
+
+    // Merge history deduplicated
+    merged.history = deduplicateHistory([...(remote.history || []), ...(local.history || [])]);
+
     if (local.rate) merged.rate = local.rate;
+    if (remote.proxyIconUrl) merged.proxyIconUrl = remote.proxyIconUrl;
     return merged;
   }
 
