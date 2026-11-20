@@ -447,6 +447,7 @@ body::after {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   overflow: hidden;
+  margin-top: 32px;
 }
 .section-header {
   display: flex;
@@ -2393,14 +2394,15 @@ input[type="date"]::-webkit-calendar-picker-indicator {
    LEADERBOARD PROFIT PENDIRI
    ══════════════════════════════════════════ */
 .leaderboard-section {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
+  background: linear-gradient(180deg, rgba(22, 27, 60, 0.65) 0%, rgba(13, 17, 40, 0.85) 100%);
+  border: 1px solid rgba(99, 102, 241, 0.25);
   border-radius: var(--radius);
   padding: 22px;
-  margin-top: 24px;
+  margin-top: 32px;
+  margin-bottom: 32px;
   position: relative;
   overflow: hidden;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
 }
 
 .leaderboard-header {
@@ -2477,7 +2479,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 /* Individual Leaderboard Card */
 .lb-card {
   border-radius: 14px;
-  padding: 18px 16px;
+  padding: 15px 14px;
   position: relative;
   overflow: hidden;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
@@ -2549,14 +2551,14 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .lb-profile-row {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 14px;
+  gap: 10px;
+  margin-bottom: 10px;
 }
 
 .lb-avatar-wrap {
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
   overflow: hidden;
   flex-shrink: 0;
   position: relative;
@@ -2604,8 +2606,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   background: rgba(0, 0, 0, 0.28);
   border: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: 10px;
-  padding: 10px 12px;
-  margin-bottom: 14px;
+  padding: 8px 10px;
+  margin-bottom: 10px;
 }
 
 .lb-profit-label {
@@ -2618,7 +2620,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
 .lb-profit-val {
   font-family: 'Space Grotesk', sans-serif;
-  font-size: 19px;
+  font-size: 18px;
   font-weight: 800;
   color: var(--green-light);
   display: flex;
