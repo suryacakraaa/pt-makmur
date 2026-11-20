@@ -1177,7 +1177,9 @@
   async function fetchMongoState(isUserTriggered = false) {
     if (_pauseRemoteWrite || _isPushing) return;
     try {
-      const res = await fetch('/api/state?t=' + Date.now());
+      const res = await fetch('/api/state?t=' + Date.now(), {
+        headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
+      });
       if (!res.ok) {
         setSyncOnline(false);
         if (isUserTriggered) showToast('Gagal terhubung ke MongoDB server', 'error');
@@ -1185,16 +1187,40 @@
       }
       const data = await res.json();
       setSyncOnline(true);
-      updateSyncTime();
 
-      if (data.exists && data.state && data.updatedAt) {
-        if (data.updatedAt > _lastSyncTime) {
-          _lastSyncTime = data.updatedAt;
-          _pauseRemoteWrite = true;
+      if (data.exists && data.state) {
+        // Compare local vs remote to detect if local has unsynced items
+        const localModals  = state.currentSession?.modals || [];
+        const remoteModals = data.state?.currentSession?.modals || [];
+        const localTxs     = state.currentSession?.transactions || [];
+        const remoteTxs    = data.state?.currentSession?.transactions || [];
+        const localProxy   = state.currentSession?.proxy || [];
+        const remoteProxy  = data.state?.currentSession?.proxy || [];
+
+        const hasNewLocalData = (
+          localModals.some(m => !remoteModals.some(rm => rm.id === m.id)) ||
+          localTxs.some(t => !remoteTxs.some(rt => rt.id === t.id)) ||
+          localProxy.some(p => !remoteProxy.some(rp => rp.id === p.id))
+        );
+
+        if (hasNewLocalData) {
+          // Device has offline/unsynced local entries -> merge and push to MongoDB Atlas!
           state = mergeStates(state, data.state);
           try { localStorage.setItem('ptmakmur_v2', JSON.stringify(state)); } catch(e) {}
           renderAll();
-          _pauseRemoteWrite = false;
+          pushMongoState(state);
+          if (isUserTriggered) showToast('✅ Data lokal di-upload ke MongoDB!', 'success');
+        } else if (data.updatedAt && data.updatedAt > _lastSyncTime) {
+          // Cloud has newer data from another device (phone/laptop)!
+          _lastSyncTime = data.updatedAt;
+          _pauseRemoteWrite = true;
+          try {
+            state = mergeStates(state, data.state);
+            localStorage.setItem('ptmakmur_v2', JSON.stringify(state));
+            renderAll();
+          } finally {
+            _pauseRemoteWrite = false;
+          }
           if (isUserTriggered) showToast('✅ Data disinkronkan dari MongoDB Atlas!', 'success');
         } else if (isUserTriggered) {
           showToast('Data sudah versi terbaru (up to date)', 'info');
@@ -1203,6 +1229,7 @@
         // First initialization to cloud
         pushMongoState(state);
       }
+      updateSyncTime();
     } catch(err) {
       setSyncOnline(false);
       if (isUserTriggered) showToast('Koneksi offline atau server belum siap', 'error');
@@ -1213,7 +1240,10 @@
     const el = document.getElementById('syncLastUpdate');
     if (el) {
       const now = new Date();
-      el.textContent = `Sync: ${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}:${now.getSeconds().toString().padStart(2,'0')}`;
+      const count = (state.currentSession?.modals?.length || 0) +
+                    (state.currentSession?.transactions?.length || 0) +
+                    (state.currentSession?.proxy?.length || 0);
+      el.textContent = `Sync: ${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}:${now.getSeconds().toString().padStart(2,'0')} (${count} item)`;
     }
   }
 
