@@ -70,8 +70,8 @@
         if (!s.rate.take) s.rate.take = 100000;
         if (!s.rate.setor) s.rate.setor = 99000;
         if (s.currentSession && !s.currentSession.id) {
-          s.currentSession.id = generateSessionId();
-          s.currentSession.createdAt = Date.now();
+          s.currentSession.id = 'sess_local_init';
+          s.currentSession.createdAt = 0;
         }
         return s;
       }
@@ -1556,31 +1556,24 @@
         // Check if session IDs match
         const isSameSession = (localSessId && remoteSessId && localSessId === remoteSessId);
 
-        if (!isSameSession) {
-          // Different sessions! One device or cloud reset/started a new session.
-          if (localResetAt > remoteResetAt) {
-            // Local started a brand new session that hasn't reached cloud -> push clean state to cloud
-            pushMongoState(state);
-            if (isUserTriggered) showToast('✅ Sesi baru tersinkron ke MongoDB!', 'success');
-          } else {
-            // Remote has a new session (e.g. from refresh or other device) -> adopt remote session directly!
-            // NEVER merge old local transactions into remote's new session!
-            _pauseRemoteWrite = true;
-            try {
-              state.currentSession = remoteState.currentSession || defaultState().currentSession;
-              state.history = deduplicateHistory([...(state.history || []), ...(remoteState.history || [])]);
-              if (remoteState.rate) state.rate = remoteState.rate;
-              if (remoteState.proxyIconUrl) state.proxyIconUrl = remoteState.proxyIconUrl;
-              state._sessionResetAt = remoteResetAt;
-              _lastSyncTime = data.updatedAt || Date.now();
-              localStorage.setItem('ptmakmur_v2', JSON.stringify(state));
-              localStorage.setItem('ptmakmur_last_sync', String(_lastSyncTime));
-              renderAll();
-            } finally {
-              _pauseRemoteWrite = false;
-            }
-            if (isUserTriggered) showToast('✅ Data disinkronkan dari MongoDB Atlas!', 'success');
+                if (!isSameSession) {
+          // Different sessions! Cloud has the authoritative active session!
+          // NEVER push local state to MongoDB on page load or fetch!
+          // Adopt remote session directly — NEVER merge old local items into remote's new session!
+          _pauseRemoteWrite = true;
+          try {
+            state.currentSession = remoteState.currentSession || defaultState().currentSession;
+            state.history = deduplicateHistory([...(state.history || []), ...(remoteState.history || [])]);
+            if (remoteState.rate) state.rate = remoteState.rate;
+            if (remoteState.proxyIconUrl) state.proxyIconUrl = remoteState.proxyIconUrl;
+            _lastSyncTime = data.updatedAt || Date.now();
+            localStorage.setItem('ptmakmur_v2', JSON.stringify(state));
+            localStorage.setItem('ptmakmur_last_sync', String(_lastSyncTime));
+            renderAll();
+          } finally {
+            _pauseRemoteWrite = false;
           }
+          if (isUserTriggered) showToast('✅ Sesi aktif disinkronkan dari MongoDB Atlas!', 'success');
         } else {
           // Both are on the SAME active session!
           const localModals  = state.currentSession?.modals || [];
