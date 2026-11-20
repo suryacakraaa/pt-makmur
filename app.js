@@ -114,6 +114,27 @@
     return `${icon('WL')} ${Math.round(wl)} WL`;
   }
 
+  // Helper to combine transactions and proxy sessions chronologically
+  function getCombinedTransactions(sess = state.currentSession) {
+    const txs = (sess.transactions || []).map(t => ({ ...t, _kind: 'tx' }));
+    const proxies = (sess.proxy || []).map(p => ({
+      id: p.id,
+      type: 'proxy',
+      hours: p.hours || 3,
+      cost: p.cost || 0,
+      note: p.note || `Sesi Proxy (${p.hours || 3} Jam)`,
+      proof: p.proof || null,
+      time: p.time || '',
+      category: 'Immortal Proxy',
+      _kind: 'proxy'
+    }));
+
+    const combined = [...txs, ...proxies];
+    // Sort chronologically using ID (base36 timestamp) or fallback to time
+    combined.sort((a, b) => (a.id || '').localeCompare(b.id || ''));
+    return combined;
+  }
+
   // Compute totals for current session
   function computeTotals() {
     const sess = state.currentSession;
@@ -121,11 +142,11 @@
     sess.modals.forEach(m => { totalModalBGL += toBGL(m.amount, m.currency); });
 
     let totalIncomeBGL = 0;
-    let totalExpenseBGL = 0;
+    let txExpenseBGL = 0;
     sess.transactions.forEach(t => {
       const v = toBGL(t.amount, t.currency);
-      if (t.type === 'income')  totalIncomeBGL  += v;
-      else                       totalExpenseBGL += v;
+      if (t.type === 'income') totalIncomeBGL += v;
+      else txExpenseBGL += v;
     });
 
     let totalProxyCost = 0;
@@ -137,11 +158,28 @@
       totalProxyHours += (p.hours || 3);
     });
 
+    // Biaya proxy dikonversi ke BGL dan dihitung sebagai bagian dari Total Pengeluaran
+    const rateSetor = state.rate?.setor || state.rate?.BGL || 99000;
+    const totalProxyBGL = rateSetor > 0 ? (totalProxyCost / rateSetor) : 0;
+    const totalExpenseBGL = txExpenseBGL + totalProxyBGL;
+
     const netBGL   = totalIncomeBGL - totalExpenseBGL;
-    const profitBGL = netBGL; // After modal subtracted during split
+    const profitBGL = netBGL; // Net profit setelah operasional dan proxy
     const totalBackpackBGL = totalModalBGL + totalIncomeBGL - totalExpenseBGL;
 
-    return { totalModalBGL, totalIncomeBGL, totalExpenseBGL, totalProxyCost, totalProxySessions, totalProxyHours, netBGL, profitBGL, totalBackpackBGL };
+    return {
+      totalModalBGL,
+      totalIncomeBGL,
+      txExpenseBGL,
+      totalExpenseBGL,
+      totalProxyCost,
+      totalProxyBGL,
+      totalProxySessions,
+      totalProxyHours,
+      netBGL,
+      profitBGL,
+      totalBackpackBGL
+    };
   }
 
   // ── NAVIGATION ─────────────────────────────────────
@@ -371,6 +409,10 @@
 
     setInner('dash-expense', `${icon('BGL')} ${t.totalExpenseBGL.toFixed(4)} BGL`);
     setInner('dash-expense-idr', `≈ ${formatIDR(toIDR(t.totalExpenseBGL))}`);
+    const expSubEl = document.getElementById('dash-expense-sub');
+    if (expSubEl) {
+      expSubEl.textContent = t.totalProxyBGL > 0 ? `Termasuk Proxy: ${t.totalProxyBGL.toFixed(4)} BGL` : '';
+    }
 
     const rateSetor = state.rate?.setor || 99000;
     const proxyBGL = rateSetor > 0 ? (t.totalProxyCost / rateSetor) : 0;
@@ -398,9 +440,10 @@
       setInner(`share-${f}`, `${shareSign}${shareEach.toFixed(4)} BGL`);
     });
 
-    // Recent transactions (last 5)
-    const all = [...state.currentSession.transactions].reverse().slice(0, 5);
-    renderTxList('dash-tx-list', all, true);
+    // Recent transactions (including proxy sessions, newest first)
+    const combined = getCombinedTransactions(state.currentSession);
+    const latest = [...combined].reverse().slice(0, 7);
+    renderTxList('dash-tx-list', latest, true);
 
     // Render Leaderboard
     renderLeaderboard();
@@ -451,9 +494,14 @@
     setInner('conv-bgl-dl', '100 DL');
     setInner('conv-dl-wl', '100 WL');
 
-    // Filtered list
-    let txs = [...state.currentSession.transactions].reverse();
-    if (txFilter !== 'all') txs = txs.filter(t => t.type === txFilter);
+    // Filtered list including proxy
+    const combined = getCombinedTransactions(state.currentSession);
+    let txs = [...combined].reverse();
+    if (txFilter === 'income') {
+      txs = txs.filter(t => t.type === 'income');
+    } else if (txFilter === 'expense') {
+      txs = txs.filter(t => t.type === 'expense' || t.type === 'proxy');
+    }
     renderTxList('tx-list', txs, true, null);
   }
 
@@ -703,15 +751,19 @@
   }
 
   function calcSessionTotals(sess) {
-    let totalModalBGL = 0, totalIncomeBGL = 0, totalExpenseBGL = 0, totalProxyCost = 0;
+    let totalModalBGL = 0, totalIncomeBGL = 0, txExpenseBGL = 0, totalProxyCost = 0;
     (sess.modals || []).forEach(m => { totalModalBGL += toBGL(m.amount, m.currency); });
     (sess.transactions || []).forEach(t => {
       const v = toBGL(t.amount, t.currency);
       if (t.type === 'income') totalIncomeBGL += v;
-      else totalExpenseBGL += v;
+      else txExpenseBGL += v;
     });
     (sess.proxy || []).forEach(p => { totalProxyCost += (p.cost || 0); });
-    return { totalModalBGL, totalIncomeBGL, totalExpenseBGL, totalProxyCost };
+    const rateSetor = state.rate?.setor || state.rate?.BGL || 99000;
+    const totalProxyBGL = rateSetor > 0 ? (totalProxyCost / rateSetor) : 0;
+    const totalExpenseBGL = txExpenseBGL + totalProxyBGL;
+    const totalBackpackBGL = totalModalBGL + totalIncomeBGL - totalExpenseBGL;
+    return { totalModalBGL, totalIncomeBGL, totalExpenseBGL, txExpenseBGL, totalProxyCost, totalProxyBGL, totalBackpackBGL };
   }
 
   function formatDate(str) {
