@@ -8,7 +8,7 @@
   <meta http-equiv="Expires" content="0" />
   <title>PT MAKMUR — Growtopia Finance Tracker</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%236366f1'/><text x='50' y='72' text-anchor='middle' font-size='60' font-weight='900' fill='white' font-family='Arial'>M</text></svg>"/>
-  <link rel="stylesheet" href="style.css?v=3.9.0" />
+  <link rel="stylesheet" href="style.css?v=4.0.0" />
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet"/>
@@ -137,6 +137,12 @@
       </svg>
       <span>Biaya Proxy</span>
     </a>
+    <a href="#" class="nav-item" data-page="legacy">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+      </svg>
+      <span>Biaya Legacy</span>
+    </a>
     <a href="#" class="nav-item" data-page="rate">
       <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
@@ -248,6 +254,18 @@
           <span class="stat-value" id="dash-proxy">Rp 0</span>
           <span class="stat-sub" id="dash-proxy-sessions">0 sesi</span>
           <span class="stat-sub" id="dash-proxy-bgl" style="font-size:10px;opacity:0.7;margin-top:2px;"></span>
+        </div>
+      </div>
+      <div class="stat-card card-legacy">
+        <div class="stat-icon">
+          <img src="icons/legacy.png" id="dashLegacyIcon" class="legacy-img-icon" alt="Legacy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" />
+          <div class="legacy-icon-fallback" style="display:none;width:100%;height:100%;align-items:center;justify-content:center;font-size:20px;color:#06b6d4;font-weight:bold;">⚡</div>
+        </div>
+        <div class="stat-info">
+          <span class="stat-label">Biaya Legacy</span>
+          <span class="stat-value" id="dash-legacy">Rp 0</span>
+          <span class="stat-sub" id="dash-legacy-count">0 entri</span>
+          <span class="stat-sub" id="dash-legacy-bgl" style="font-size:10px;opacity:0.7;margin-top:2px;"></span>
         </div>
       </div>
     </div>
@@ -714,6 +732,124 @@
     </div>
   </section>
 
+  <!-- ░░░ PAGE: LEGACY ░░░ -->
+  <section class="page" id="page-legacy">
+    <div class="page-hero">
+      <h1 class="page-title">Biaya Legacy</h1>
+      <p class="page-subtitle">Pencatatan pengeluaran Legacy Bot / Tool (fleksibel nominal Rp, DL, atau BGL)</p>
+    </div>
+    <div class="form-grid-2">
+      <div class="card-form">
+        <div class="form-title">TAMBAH BIAYA LEGACY</div>
+        <div class="legacy-banner" id="legacy-banner-display">
+          <div class="legacy-icon-wrap" id="legacyIconDisplay">
+            <img src="icons/legacy.png" id="legacyBannerImg" class="legacy-banner-img" alt="Legacy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+            <div class="legacy-fallback-emblem" style="display:none;width:100%;height:100%;align-items:center;justify-content:center;font-size:22px;color:#06b6d4;">⚡</div>
+          </div>
+          <div style="flex:1;">
+            <div class="legacy-name" id="legacyDisplayName">Legacy Bot / Tool</div>
+            <div class="legacy-price">Pengeluaran Operasional Legacy</div>
+          </div>
+          <div>
+            <button type="button" id="btnUploadLegacyLogo" class="btn-secondary" style="font-size:11px;padding:4px 9px;border-radius:6px;" title="Upload Logo Legacy">🖼️ Ganti Logo</button>
+            <input type="file" id="legacyLogoInput" accept="image/*" style="display:none;" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Mata Uang &amp; Nominal Biaya</label>
+          <div style="display:flex;gap:6px;margin-bottom:8px;">
+            <button type="button" class="btn-legacy-currency active" data-cur="IDR">Rp (IDR)</button>
+            <button type="button" class="btn-legacy-currency" data-cur="DL">DL</button>
+            <button type="button" class="btn-legacy-currency" data-cur="BGL">BGL</button>
+          </div>
+          <input type="number" id="legacy-amount" class="form-control" placeholder="Masukkan jumlah nominal (contoh: 50000)" step="any" min="0" />
+        </div>
+
+        <div class="form-group">
+          <label>Estimasi Konversi Biaya</label>
+          <div id="legacy-conv-preview" style="padding:10px 14px;background:rgba(6,182,212,0.08);border:1px solid rgba(6,182,212,0.25);border-radius:8px;font-size:13px;color:#06b6d4;display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+            <span>💱 Nilai Setara:</span>
+            <span id="legacy-conv-primary" style="font-weight:700;">Rp 0</span>
+            <span style="opacity:0.4;">·</span>
+            <span id="legacy-conv-secondary">≈ 0.00 DL / 0.0000 BGL</span>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Durasi / Masa Aktif</label>
+          <input type="text" id="legacy-duration" class="form-control" placeholder="Contoh: 1 Hari, 3 Hari, 1 Bulan..." value="1 Hari" />
+          <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">
+            <button type="button" class="btn-preset-legacy" data-dur="12 Jam">12 Jam</button>
+            <button type="button" class="btn-preset-legacy active" data-dur="1 Hari">1 Hari</button>
+            <button type="button" class="btn-preset-legacy" data-dur="3 Hari">3 Hari</button>
+            <button type="button" class="btn-preset-legacy" data-dur="7 Hari">7 Hari</button>
+            <button type="button" class="btn-preset-legacy" data-dur="14 Hari">14 Hari</button>
+            <button type="button" class="btn-preset-legacy" data-dur="1 Bulan">1 Bulan</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Keterangan</label>
+          <input type="text" id="legacy-note" class="form-control" placeholder="Contoh: Sewa bot 1 hari, key legacy, transfer BCA..." />
+        </div>
+
+        <!-- BUKTI PEMBAYARAN LEGACY -->
+        <div class="form-group">
+          <label>Penyimpanan Bukti Pembayaran Legacy</label>
+          <div class="upload-zone-proof" id="legacyProofUploadZone">
+            <input type="file" id="legacyProofInput" accept="image/*" style="display:none;" />
+            <div id="legacyProofPlaceholder">
+              <div style="font-size:26px;margin-bottom:6px;">🧾</div>
+              <div style="font-weight:600;font-size:13px;color:var(--text-primary);margin-bottom:2px;">Pilih File atau Drag &amp; Drop Bukti Transfer</div>
+              <div style="font-size:11px;color:var(--text-muted);">Format Gambar (PNG, JPG, JPEG)</div>
+            </div>
+            <div id="legacyProofPreviewWrap" style="display:none;position:relative;flex-direction:column;align-items:center;gap:8px;">
+              <img id="legacyProofPreviewImg" src="" style="max-height:120px;max-width:100%;border-radius:8px;border:1px solid var(--border);" alt="Preview Bukti Transfer" />
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span id="legacyProofFileName" style="font-size:11px;color:var(--text-muted);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">bukti.png</span>
+                <button type="button" id="btnRemoveLegacyProof" class="btn-danger" style="padding:3px 8px;font-size:11px;border-radius:4px;">✕ Hapus</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <button class="btn btn-primary btn-block" id="btnAddLegacy" style="margin-top:16px;background:linear-gradient(135deg, #0891b2, #06b6d4);">⚡ Tambah Biaya Legacy</button>
+      </div>
+
+      <div class="card-form">
+        <div class="form-title">RINGKASAN LEGACY HARI INI</div>
+        <div class="legacy-summary-grid">
+          <div class="legacy-sum-item">
+            <div class="legacy-sum-icon">⚡</div>
+            <div class="legacy-sum-label">Total Entri</div>
+            <div class="legacy-sum-value" id="ls-count">0 Entri</div>
+          </div>
+          <div class="legacy-sum-item">
+            <div class="legacy-sum-icon">⏱️</div>
+            <div class="legacy-sum-label">Masa Aktif</div>
+            <div class="legacy-sum-value" id="ls-duration">—</div>
+          </div>
+          <div class="legacy-sum-item">
+            <div class="legacy-sum-icon">💰</div>
+            <div class="legacy-sum-label">Total Biaya</div>
+            <div class="legacy-sum-value cyan" id="ls-cost">Rp 0</div>
+            <div style="font-size:11px;color:#06b6d4;margin-top:3px;" id="ls-cost-bgl">≈ 0.00 DL</div>
+          </div>
+        </div>
+
+        <div class="section-block" style="margin-top:20px;">
+          <div class="section-header">
+            <h3 class="section-title">Riwayat Biaya Legacy Hari Ini</h3>
+          </div>
+          <div class="tx-list" id="legacy-log-list">
+            <div class="tx-empty">Belum ada biaya legacy hari ini</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- ░░░ PAGE: RATE ░░░ -->
   <section class="page" id="page-rate">
     <div class="page-hero">
@@ -971,7 +1107,7 @@
 <!-- TOAST NOTIFICATION -->
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=3.9.0"></script>
-<script src="galaxy.js?v=3.9.0"></script>
+<script src="app.js?v=4.0.0"></script>
+<script src="galaxy.js?v=4.0.0"></script>
 </body>
 </html>

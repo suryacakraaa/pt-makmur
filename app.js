@@ -51,10 +51,12 @@
         modals: [],       // { founder, amount, currency, note, time }
         transactions: [], // { type, amount, currency, category, note, time }
         proxy: [],        // { hours, cost, note, proof, time }
+        legacy: [],       // { amount, currency, costIDR, costBGL, duration, note, proof, time }
       },
       rate: { BGL: 100000, DL: 1000, WL: 10, take: 100000, setor: 99000 },
       history: [],  // array of session snapshots
       proxyIconUrl: null,
+      legacyIconUrl: null,
       _sessionResetAt: now,
     };
   }
@@ -69,9 +71,12 @@
         }
         if (!s.rate.take) s.rate.take = 100000;
         if (!s.rate.setor) s.rate.setor = 99000;
-        if (s.currentSession && !s.currentSession.id) {
-          s.currentSession.id = 'sess_local_init';
-          s.currentSession.createdAt = 0;
+        if (s.currentSession) {
+          if (!s.currentSession.id) {
+            s.currentSession.id = 'sess_local_init';
+            s.currentSession.createdAt = 0;
+          }
+          if (!s.currentSession.legacy) s.currentSession.legacy = [];
         }
         return s;
       }
@@ -126,7 +131,7 @@
     return `${icon('WL')} ${Math.round(wl)} WL`;
   }
 
-  // Helper to combine transactions and proxy sessions chronologically
+  // Helper to combine transactions, proxy sessions, and legacy expenses chronologically
   function getCombinedTransactions(sess = state.currentSession) {
     const txs = (sess.transactions || []).map(t => ({ ...t, _kind: 'tx' }));
     const proxies = (sess.proxy || []).map(p => ({
@@ -140,8 +145,22 @@
       category: 'Immortal Proxy',
       _kind: 'proxy'
     }));
+    const legacies = (sess.legacy || []).map(l => ({
+      id: l.id,
+      type: 'legacy',
+      amount: l.amount || 0,
+      currency: l.currency || 'IDR',
+      cost: l.costIDR || 0,
+      costBGL: l.costBGL || 0,
+      duration: l.duration || '',
+      note: l.note || `Biaya Legacy (${l.duration || ''})`,
+      proof: l.proof || null,
+      time: l.time || '',
+      category: 'Legacy',
+      _kind: 'legacy'
+    }));
 
-    const combined = [...txs, ...proxies];
+    const combined = [...txs, ...proxies, ...legacies];
     // Sort chronologically using ID (base36 timestamp) or fallback to time
     combined.sort((a, b) => (a.id || '').localeCompare(b.id || ''));
     return combined;
@@ -170,13 +189,22 @@
       totalProxyHours += (p.hours || 3);
     });
 
-    // Biaya proxy dikonversi ke BGL dan dihitung sebagai bagian dari Total Pengeluaran
+    let totalLegacyCostIDR = 0;
+    let totalLegacyBGL = 0;
+    let totalLegacyCount = 0;
+    (sess.legacy || []).forEach(l => {
+      totalLegacyCostIDR += (l.costIDR || 0);
+      totalLegacyBGL     += (l.costBGL || 0);
+      totalLegacyCount   += 1;
+    });
+
+    // Biaya proxy dan legacy dikonversi ke BGL dan masuk ke Total Pengeluaran
     const rateSetor = state.rate?.setor || state.rate?.BGL || 99000;
     const totalProxyBGL = rateSetor > 0 ? (totalProxyCost / rateSetor) : 0;
-    const totalExpenseBGL = txExpenseBGL + totalProxyBGL;
+    const totalExpenseBGL = txExpenseBGL + totalProxyBGL + totalLegacyBGL;
 
     const netBGL   = totalIncomeBGL - totalExpenseBGL;
-    const profitBGL = netBGL; // Net profit setelah operasional dan proxy
+    const profitBGL = netBGL; // Net profit setelah operasional, proxy, dan legacy
     const totalBackpackBGL = totalModalBGL + totalIncomeBGL - totalExpenseBGL;
 
     return {
@@ -188,6 +216,9 @@
       totalProxyBGL,
       totalProxySessions,
       totalProxyHours,
+      totalLegacyCostIDR,
+      totalLegacyBGL,
+      totalLegacyCount,
       netBGL,
       profitBGL,
       totalBackpackBGL
@@ -200,6 +231,7 @@
     modal:     'Catat Modal',
     transaksi: 'Pemasukan & Pengeluaran',
     proxy:     'Biaya Proxy',
+    legacy:    'Biaya Legacy',
     rate:      'Rate BGL',
     history:   'Riwayat Harian',
   };
@@ -222,6 +254,7 @@
     if (page === 'modal')     renderModalPage();
     if (page === 'transaksi') renderTransaksiPage();
     if (page === 'proxy')     renderProxyPage();
+    if (page === 'legacy')    renderLegacyPage();
     if (page === 'rate')      renderRatePage();
     if (page === 'history')   renderHistoryPage();
 
@@ -423,7 +456,10 @@
     setInner('dash-expense-idr', `≈ ${formatIDR(toIDR(t.totalExpenseBGL))}`);
     const expSubEl = document.getElementById('dash-expense-sub');
     if (expSubEl) {
-      expSubEl.textContent = t.totalProxyBGL > 0 ? `Termasuk Proxy: ${t.totalProxyBGL.toFixed(4)} BGL` : '';
+      const parts = [];
+      if (t.totalProxyBGL > 0)  parts.push(`Proxy: ${t.totalProxyBGL.toFixed(4)} BGL`);
+      if (t.totalLegacyBGL > 0) parts.push(`Legacy: ${t.totalLegacyBGL.toFixed(4)} BGL`);
+      expSubEl.textContent = parts.length > 0 ? `Termasuk: ${parts.join(' · ')}` : '';
     }
 
     const rateSetor = state.rate?.setor || 99000;
@@ -432,6 +468,15 @@
     setInner('dash-proxy', formatIDR(t.totalProxyCost));
     setInner('dash-proxy-sessions', `${t.totalProxySessions} sesi (${t.totalProxyHours || 0} jam)`);
     setInner('dash-proxy-bgl', rateSetor > 0 ? `≈ ${proxyDL.toFixed(1)} DL / ${proxyBGL.toFixed(4)} BGL` : '');
+
+    // Biaya Legacy Card
+    const legBGL = t.totalLegacyBGL || 0;
+    const legDL  = legBGL * 100;
+    setInner('dash-legacy', formatIDR(t.totalLegacyCostIDR || 0));
+    setInner('dash-legacy-count', `${t.totalLegacyCount || 0} entri`);
+    setInner('dash-legacy-bgl', rateSetor > 0 ? `≈ ${legDL.toFixed(1)} DL / ${legBGL.toFixed(4)} BGL` : '');
+    const dashLegIcon = document.getElementById('dashLegacyIcon');
+    if (dashLegIcon && state.legacyIconUrl) dashLegIcon.src = state.legacyIconUrl;
 
     // Profit
     const profitEl = document.getElementById('profitValue');
@@ -763,7 +808,7 @@
   }
 
   function calcSessionTotals(sess) {
-    let totalModalBGL = 0, totalIncomeBGL = 0, txExpenseBGL = 0, totalProxyCost = 0;
+    let totalModalBGL = 0, totalIncomeBGL = 0, txExpenseBGL = 0, totalProxyCost = 0, totalLegacyCostIDR = 0, totalLegacyBGL = 0;
     (sess.modals || []).forEach(m => { totalModalBGL += toBGL(m.amount, m.currency); });
     (sess.transactions || []).forEach(t => {
       const v = toBGL(t.amount, t.currency);
@@ -771,11 +816,15 @@
       else txExpenseBGL += v;
     });
     (sess.proxy || []).forEach(p => { totalProxyCost += (p.cost || 0); });
+    (sess.legacy || []).forEach(l => {
+      totalLegacyCostIDR += (l.costIDR || 0);
+      totalLegacyBGL     += (l.costBGL || 0);
+    });
     const rateSetor = state.rate?.setor || state.rate?.BGL || 99000;
     const totalProxyBGL = rateSetor > 0 ? (totalProxyCost / rateSetor) : 0;
-    const totalExpenseBGL = txExpenseBGL + totalProxyBGL;
+    const totalExpenseBGL = txExpenseBGL + totalProxyBGL + totalLegacyBGL;
     const totalBackpackBGL = totalModalBGL + totalIncomeBGL - totalExpenseBGL;
-    return { totalModalBGL, totalIncomeBGL, totalExpenseBGL, txExpenseBGL, totalProxyCost, totalProxyBGL, totalBackpackBGL };
+    return { totalModalBGL, totalIncomeBGL, totalExpenseBGL, txExpenseBGL, totalProxyCost, totalProxyBGL, totalLegacyCostIDR, totalLegacyBGL, totalBackpackBGL };
   }
 
   function formatDate(str) {
@@ -800,7 +849,9 @@
 
       let typeIconHtml = '📋';
       if (type === 'proxy') {
-        typeIconHtml = '<img src="icons/immortal_proxy_32.png" class="proxy-img-sm" alt="Proxy">';
+        typeIconHtml = `<img src="${state.proxyIconUrl || 'icons/immortal_proxy_32.png'}" class="proxy-img-sm" alt="Proxy">`;
+      } else if (type === 'legacy') {
+        typeIconHtml = `<img src="${state.legacyIconUrl || 'icons/legacy_32.png'}" class="legacy-img-sm" alt="Legacy" onerror="this.style.display='none';this.nextElementSibling.style.display='inline';"><span style="display:none;color:#06b6d4;font-size:15px;font-weight:bold;">⚡</span>`;
       } else if (type === 'modal') {
         typeIconHtml = icon(item.currency || 'BGL', 'gt-currency-img-sm');
       } else if (item.currency) {
@@ -820,6 +871,11 @@
         const itemDL  = itemBGL * 100;
         const dlStr   = rateSetor > 0 ? `<span style="font-size:10px;color:var(--orange);display:block;">≈ ${itemDL.toFixed(2)} DL / ${itemBGL.toFixed(4)} BGL</span>` : '';
         amountHtml = `<span class="tx-amount proxy">${formatIDR(item.cost)}${dlStr}</span>`;
+      } else if (type === 'legacy') {
+        const bglVal = item.costBGL || 0;
+        const dlVal  = bglVal * 100;
+        const dlStr  = `<span style="font-size:10px;color:#06b6d4;display:block;">≈ ${dlVal.toFixed(2)} DL / ${bglVal.toFixed(4)} BGL</span>`;
+        amountHtml = `<span class="tx-amount legacy">${formatIDR(item.cost || 0)}${dlStr}</span>`;
       } else if (type === 'modal') {
         amountHtml = `<span class="tx-amount modal">+${formatCurrency(item.amount, item.currency)}</span>`;
       } else {
@@ -835,11 +891,14 @@
         const h = item.hours || 3;
         metaParts.push(`${h} Jam sewa`);
       }
+      if (type === 'legacy') {
+        if (item.duration) metaParts.push(item.duration);
+      }
       if (type === 'modal') metaParts.push(`Modal ${item.founder}`);
 
       let proofBtnHtml = '';
-      if (type === 'proxy' && item.proof) {
-        proofBtnHtml = `<button type="button" class="btn-view-proof" data-proof-id="${item.id}" title="Lihat Bukti Transfer">🧾 Lihat Bukti</button>`;
+      if ((type === 'proxy' || type === 'legacy') && item.proof) {
+        proofBtnHtml = `<button type="button" class="btn-view-proof" data-proof-id="${item.id}" data-proof-type="${type}" title="Lihat Bukti Transfer">🧾 Lihat Bukti</button>`;
       }
 
       div.innerHTML = `
@@ -893,6 +952,8 @@
       state.currentSession.modals = state.currentSession.modals.filter(x => x.id !== id);
     } else if (type === 'proxy') {
       state.currentSession.proxy = state.currentSession.proxy.filter(x => x.id !== id);
+    } else if (type === 'legacy') {
+      state.currentSession.legacy = (state.currentSession.legacy || []).filter(x => x.id !== id);
     } else {
       state.currentSession.transactions = state.currentSession.transactions.filter(x => x.id !== id);
     }
@@ -1270,6 +1331,7 @@
         modals: [],
         transactions: [],
         proxy: [],
+        legacy: [],
       };
       state._sessionResetAt = now;
 
@@ -1582,11 +1644,14 @@
           const remoteTxs    = remoteState.currentSession?.transactions || [];
           const localProxy   = state.currentSession?.proxy || [];
           const remoteProxy  = remoteState.currentSession?.proxy || [];
+          const localLegacy  = state.currentSession?.legacy || [];
+          const remoteLegacy = remoteState.currentSession?.legacy || [];
 
           const hasNewLocalData = (
             localModals.some(m => !remoteModals.some(rm => rm.id === m.id)) ||
             localTxs.some(t => !remoteTxs.some(rt => rt.id === t.id)) ||
-            localProxy.some(p => !remoteProxy.some(rp => rp.id === p.id))
+            localProxy.some(p => !remoteProxy.some(rp => rp.id === p.id)) ||
+            localLegacy.some(l => !remoteLegacy.some(rl => rl.id === l.id))
           );
 
           if (hasNewLocalData) {
@@ -1684,6 +1749,7 @@
         modals:       mergeArr(ls.modals, rs.modals),
         transactions: mergeArr(ls.transactions, rs.transactions),
         proxy:        mergeArr(ls.proxy, rs.proxy),
+        legacy:       mergeArr(ls.legacy, rs.legacy),
       };
     } else {
       // Different sessions: remote session wins
@@ -1695,6 +1761,7 @@
 
     if (local.rate) merged.rate = local.rate;
     if (remote.proxyIconUrl) merged.proxyIconUrl = remote.proxyIconUrl;
+    if (remote.legacyIconUrl) merged.legacyIconUrl = remote.legacyIconUrl;
     return merged;
   }
 
@@ -1839,6 +1906,7 @@
     initLogin();
     checkAuthOnLoad();
     initCloudSync();
+    initLegacy();
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', startApp);
@@ -1847,7 +1915,241 @@
   }
 
   // ============================================================
-  // FOUNDER CAROUSEL
+
+  // ══════════════════════════════════════════════════
+  // BIAYA LEGACY LOGIC
+  // ══════════════════════════════════════════════════
+  let selectedLegacyCurrency = 'IDR';
+  let selectedLegacyProofBase64 = null;
+  let selectedLegacyProofName = '';
+
+  function renderLegacyPage() {
+    const sess = state.currentSession;
+    const legList = sess.legacy || [];
+    const rateSetor = state.rate?.setor || state.rate?.BGL || 99000;
+
+    let totalCostIDR = 0;
+    let totalCostBGL = 0;
+    const durSet = [];
+    legList.forEach(l => {
+      totalCostIDR += (l.costIDR || 0);
+      totalCostBGL += (l.costBGL || 0);
+      if (l.duration && !durSet.includes(l.duration)) durSet.push(l.duration);
+    });
+
+    const totalDL = totalCostBGL * 100;
+    setInner('ls-count', `${legList.length} Entri`);
+    setInner('ls-duration', durSet.length > 0 ? durSet.join(', ') : '—');
+    setInner('ls-cost', formatIDR(totalCostIDR));
+    setInner('ls-cost-bgl', rateSetor > 0 ? `≈ ${totalDL.toFixed(2)} DL / ${totalCostBGL.toFixed(4)} BGL` : '');
+
+    renderTxList('legacy-log-list', [...legList].reverse(), true, 'legacy');
+
+    // Update banner icon if customized
+    const bannerImg = document.getElementById('legacyBannerImg');
+    if (bannerImg && state.legacyIconUrl) {
+      bannerImg.src = state.legacyIconUrl;
+    }
+    updateLegacyCalc();
+  }
+
+  function updateLegacyCalc() {
+    const amtInput = document.getElementById('legacy-amount');
+    const amt = parseFloat(amtInput?.value || 0);
+    const rateSetor = state.rate?.setor || state.rate?.BGL || 99000;
+
+    let costIDR = 0;
+    let costBGL = 0;
+
+    if (selectedLegacyCurrency === 'IDR') {
+      costIDR = amt;
+      costBGL = rateSetor > 0 ? (amt / rateSetor) : 0;
+    } else if (selectedLegacyCurrency === 'DL') {
+      costBGL = amt / 100;
+      costIDR = costBGL * rateSetor;
+    } else if (selectedLegacyCurrency === 'BGL') {
+      costBGL = amt;
+      costIDR = costBGL * rateSetor;
+    }
+
+    const costDL = costBGL * 100;
+    const primEl = document.getElementById('legacy-conv-primary');
+    const secEl  = document.getElementById('legacy-conv-secondary');
+
+    if (primEl) {
+      primEl.textContent = formatIDR(costIDR);
+    }
+    if (secEl) {
+      secEl.textContent = `≈ ${costDL.toFixed(2)} DL / ${costBGL.toFixed(4)} BGL`;
+    }
+  }
+
+  function initLegacy() {
+    const amtInput = document.getElementById('legacy-amount');
+    const durInput = document.getElementById('legacy-duration');
+    const noteInput = document.getElementById('legacy-note');
+
+    amtInput?.addEventListener('input', updateLegacyCalc);
+
+    // Currency selector buttons
+    document.querySelectorAll('.btn-legacy-currency').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.btn-legacy-currency').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        selectedLegacyCurrency = btn.dataset.cur || 'IDR';
+        if (amtInput) {
+          amtInput.placeholder = selectedLegacyCurrency === 'IDR'
+            ? 'Masukkan nominal Rp (contoh: 50000)'
+            : `Masukkan jumlah ${selectedLegacyCurrency} (contoh: 50)`;
+        }
+        updateLegacyCalc();
+      });
+    });
+
+    // Preset duration buttons
+    document.querySelectorAll('.btn-preset-legacy').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.btn-preset-legacy').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        if (durInput) durInput.value = btn.dataset.dur || '';
+      });
+    });
+
+    // Proof upload & drag-drop
+    const proofZone = document.getElementById('legacyProofUploadZone');
+    const proofInput = document.getElementById('legacyProofInput');
+    const placeholder = document.getElementById('legacyProofPlaceholder');
+    const previewWrap = document.getElementById('legacyProofPreviewWrap');
+    const previewImg  = document.getElementById('legacyProofPreviewImg');
+    const fileNameEl  = document.getElementById('legacyProofFileName');
+    const btnRemove   = document.getElementById('btnRemoveLegacyProof');
+
+    function resetLegacyProof() {
+      selectedLegacyProofBase64 = null;
+      selectedLegacyProofName = '';
+      if (proofInput) proofInput.value = '';
+      if (previewImg) previewImg.src = '';
+      if (previewWrap) previewWrap.style.display = 'none';
+      if (placeholder) placeholder.style.display = 'block';
+    }
+
+    function handleLegacyProof(file) {
+      if (!file || !file.type.startsWith('image/')) {
+        showToast('Pilih file gambar (PNG / JPG / JPEG)', 'error');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = ev => {
+        selectedLegacyProofBase64 = ev.target.result;
+        selectedLegacyProofName = file.name;
+        if (previewImg) previewImg.src = selectedLegacyProofBase64;
+        if (fileNameEl) fileNameEl.textContent = file.name;
+        if (placeholder) placeholder.style.display = 'none';
+        if (previewWrap) previewWrap.style.display = 'flex';
+        showToast('Bukti transfer Legacy dipilih!', 'success');
+      };
+      reader.readAsDataURL(file);
+    }
+
+    proofZone?.addEventListener('click', e => {
+      if (e.target.closest('#btnRemoveLegacyProof')) return;
+      proofInput?.click();
+    });
+    proofZone?.addEventListener('dragover', e => {
+      e.preventDefault();
+      proofZone.classList.add('dragover');
+    });
+    proofZone?.addEventListener('dragleave', () => proofZone.classList.remove('dragover'));
+    proofZone?.addEventListener('drop', e => {
+      e.preventDefault();
+      proofZone.classList.remove('dragover');
+      const file = e.dataTransfer?.files[0];
+      if (file) handleLegacyProof(file);
+    });
+    proofInput?.addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (file) handleLegacyProof(file);
+    });
+    btnRemove?.addEventListener('click', e => {
+      e.stopPropagation();
+      resetLegacyProof();
+      showToast('Bukti transfer dihapus', 'info');
+    });
+
+    // Custom Logo Upload
+    const btnUploadLogo = document.getElementById('btnUploadLegacyLogo');
+    const logoInput     = document.getElementById('legacyLogoInput');
+    btnUploadLogo?.addEventListener('click', () => logoInput?.click());
+    logoInput?.addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (!file || !file.type.startsWith('image/')) {
+        showToast('Pilih file gambar logo', 'error');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = ev => {
+        state.legacyIconUrl = ev.target.result;
+        saveState();
+        const bannerImg = document.getElementById('legacyBannerImg');
+        const dashIcon  = document.getElementById('dashLegacyIcon');
+        if (bannerImg) bannerImg.src = state.legacyIconUrl;
+        if (dashIcon) dashIcon.src = state.legacyIconUrl;
+        showToast('Logo Legacy berhasil diperbarui!', 'success');
+      };
+      reader.readAsDataURL(file);
+    });
+
+    // Add Legacy Button
+    document.getElementById('btnAddLegacy')?.addEventListener('click', () => {
+      const amt = parseFloat(amtInput?.value || 0);
+      if (isNaN(amt) || amt <= 0) {
+        showToast('Masukkan jumlah nominal biaya yang valid!', 'error');
+        return;
+      }
+
+      const duration = durInput?.value?.trim() || '1 Hari';
+      const note = noteInput?.value?.trim() || '';
+      const rateSetor = state.rate?.setor || state.rate?.BGL || 99000;
+
+      let costIDR = 0;
+      let costBGL = 0;
+      if (selectedLegacyCurrency === 'IDR') {
+        costIDR = amt;
+        costBGL = rateSetor > 0 ? (amt / rateSetor) : 0;
+      } else if (selectedLegacyCurrency === 'DL') {
+        costBGL = amt / 100;
+        costIDR = costBGL * rateSetor;
+      } else if (selectedLegacyCurrency === 'BGL') {
+        costBGL = amt;
+        costIDR = costBGL * rateSetor;
+      }
+
+      if (!state.currentSession.legacy) state.currentSession.legacy = [];
+
+      state.currentSession.legacy.push({
+        id: uid(),
+        amount: amt,
+        currency: selectedLegacyCurrency,
+        costIDR,
+        costBGL,
+        duration,
+        note,
+        proof: selectedLegacyProofBase64 || null,
+        time: timeNow()
+      });
+
+      saveState();
+      showToast(`Biaya Legacy (${formatIDR(costIDR)}) berhasil dicatat!`, 'success');
+
+      // Reset form
+      if (amtInput) amtInput.value = '';
+      if (noteInput) noteInput.value = '';
+      resetLegacyProof();
+      renderAll();
+    });
+  }
+
+    // FOUNDER CAROUSEL
   // ============================================================
   function initFounderCarousel() {
     const cards   = Array.from(document.querySelectorAll('.founder-card'));
